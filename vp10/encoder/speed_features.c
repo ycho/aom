@@ -133,7 +133,9 @@ static void set_good_speed_feature(VP10_COMP *cpi, VP10_COMMON *cm,
   const int boosted = frame_is_boosted(cpi);
 
   sf->adaptive_rd_thresh = 1;
+#if !CONFIG_PVQ
   sf->allow_skip_recode = 1;
+#endif
 
   if (speed >= 1) {
     if ((cpi->twopass.fr_content_type == FC_GRAPHICS_ANIMATION) ||
