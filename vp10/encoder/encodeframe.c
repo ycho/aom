@@ -2757,7 +2757,10 @@ static void encode_frame_internal(VP10_COMP *cpi) {
       cm->use_prev_frame_mvs ? cm->prev_mip + cm->mi_stride + 1 : NULL;
 
   x->quant_fp = cpi->sf.use_quant_fp;
+
+#if !CONFIG_PVQ
   vp10_zero(x->skip_txfm);
+#endif
 
   {
     struct vpx_usec_timer emr_timer;
@@ -2981,9 +2984,9 @@ static void encode_superblock(VP10_COMP *cpi, ThreadData *td, TOKENEXTRA **t,
                    cpi->oxcf.aq_mode != COMPLEXITY_AQ &&
                    cpi->oxcf.aq_mode != CYCLIC_REFRESH_AQ &&
                    cpi->sf.allow_skip_recode;
-
+#if !CONFIG_PVQ
   if (!x->skip_recode) memset(x->skip_txfm, 0, sizeof(x->skip_txfm));
-
+#endif
   x->skip_optimize = ctx->is_coded;
   ctx->is_coded = 1;
   x->use_lp32x32fdct = cpi->sf.use_lp32x32fdct;

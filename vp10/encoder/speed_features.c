@@ -226,6 +226,11 @@ static void set_good_speed_feature(VP10_COMP *cpi, VP10_COMMON *cm,
     sf->mv.reduce_first_step_size = 1;
     sf->simple_model_rd_from_var = 1;
   }
+#if 1
+  sf->partition_search_type = FIXED_PARTITION;
+  sf->always_this_block_size = BLOCK_8X8;
+  sf->tx_size_search_method = USE_LARGESTALL;
+#endif
 }
 
 static void set_rt_speed_feature_framesize_dependent(VP10_COMP *cpi,

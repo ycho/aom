@@ -181,7 +181,9 @@ static void model_rd_for_sb(VP10_COMP *cpi, BLOCK_SIZE bsize, MACROBLOCK *x,
   unsigned int sum_sse = 0;
   int64_t total_sse = 0;
   int skip_flag = 1;
+#if !CONFIG_PVQ
   const int shift = 6;
+#endif
   int rate;
   int64_t dist;
   const int dequant_shift =
@@ -198,12 +200,14 @@ static void model_rd_for_sb(VP10_COMP *cpi, BLOCK_SIZE bsize, MACROBLOCK *x,
     const BLOCK_SIZE bs = get_plane_block_size(bsize, pd);
     const TX_SIZE max_tx_size = max_txsize_lookup[bs];
     const BLOCK_SIZE unit_size = txsize_to_bsize[max_tx_size];
+#if !CONFIG_PVQ
     const int64_t dc_thr = p->quant_thred[0] >> shift;
     const int64_t ac_thr = p->quant_thred[1] >> shift;
     // The low thresholds are used to measure if the prediction errors are
     // low enough so that we can skip the mode search.
     const int64_t low_dc_thr = VPXMIN(50, dc_thr >> 2);
     const int64_t low_ac_thr = VPXMIN(80, ac_thr >> 2);
+#endif
     int bw = 1 << (b_width_log2_lookup[bs] - b_width_log2_lookup[unit_size]);
     int bh = 1 << (b_height_log2_lookup[bs] - b_width_log2_lookup[unit_size]);
     int idx, idy;
@@ -224,7 +228,9 @@ static void model_rd_for_sb(VP10_COMP *cpi, BLOCK_SIZE bsize, MACROBLOCK *x,
         x->bsse[(i << 2) + block_idx] = sse;
         sum_sse += sse;
 
+#if !CONFIG_PVQ
         x->skip_txfm[(i << 2) + block_idx] = SKIP_TXFM_NONE;
+
         if (!x->select_tx_size) {
           // Check if all ac coefficients can be quantized to zero.
           if (var < ac_thr || var == 0) {
@@ -239,7 +245,9 @@ static void model_rd_for_sb(VP10_COMP *cpi, BLOCK_SIZE bsize, MACROBLOCK *x,
             }
           }
         }
-
+#else
+        (void) var;
+#endif
         if (skip_flag && !low_err_skip) skip_flag = 0;
 
         if (i == 0) x->pred_sse[ref] += sse;
@@ -507,6 +515,7 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
     vp10_encode_block_intra(plane, block, blk_row, blk_col, plane_bsize,
                             tx_size, &arg);
     dist_block(x, plane, block, tx_size, &dist, &sse);
+#if !CONFIG_PVQ
   } else if (max_txsize_lookup[plane_bsize] == tx_size) {
     if (x->skip_txfm[(plane << 2) + (block >> (tx_size << 1))] ==
         SKIP_TXFM_NONE) {
@@ -522,11 +531,8 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
                           tx_size);
       sse = x->bsse[(plane << 2) + (block >> (tx_size << 1))] << 4;
       dist = sse;
-#if !CONFIG_PVQ
+
       if (x->plane[plane].eobs[block]) {
-#else
-      if (pvq_info->ac_dc_coded) {
-#endif
         const int64_t orig_sse = (int64_t)coeff[0] * coeff[0];
         const int64_t resd_sse = coeff[0] - dqcoeff[0];
         int64_t dc_correct = orig_sse - resd_sse * resd_sse;
@@ -541,12 +547,10 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
       // SKIP_TXFM_AC_DC
       // skip forward transform
       x->plane[plane].eobs[block] = 0;
-#if CONFIG_PVQ
-      pvq_info->ac_dc_coded = 0;
-#endif
       sse = x->bsse[(plane << 2) + (block >> (tx_size << 1))] << 4;
       dist = sse;
     }
+#endif
   } else {
     // full forward transform and quantization
     vp10_xform_quant(x, plane, block, blk_row, blk_col, plane_bsize, tx_size);
@@ -1321,9 +1325,9 @@ static int64_t rd_pick_intra_sby_mode(VP10_COMP *cpi, MACROBLOCK *x, int *rate,
   od_encode_checkpoint(&x->daala_enc, &buf);
 #endif
   bmode_costs = cpi->y_mode_costs[A][L];
-
+#if !CONFIG_PVQ
   memset(x->skip_txfm, SKIP_TXFM_NONE, sizeof(x->skip_txfm));
-
+#endif
   /* Y Search for intra prediction mode */
   for (mode = DC_PRED; mode <= TM_PRED; mode++) {
     mic->mbmi.mode = mode;
@@ -1422,7 +1426,9 @@ static int64_t rd_pick_intra_sbuv_mode(VP10_COMP *cpi, MACROBLOCK *x,
   od_rollback_buffer buf;
 #endif
 
+#if !CONFIG_PVQ
   memset(x->skip_txfm, SKIP_TXFM_NONE, sizeof(x->skip_txfm));
+#endif
 
 #if CONFIG_PVQ
     od_encode_checkpoint(&x->daala_enc, &buf);
@@ -1468,7 +1474,9 @@ static int64_t rd_sbuv_dcpred(const VP10_COMP *cpi, MACROBLOCK *x, int *rate,
   int64_t unused;
 
   x->e_mbd.mi[0]->mbmi.uv_mode = DC_PRED;
+#if !CONFIG_PVQ
   memset(x->skip_txfm, SKIP_TXFM_NONE, sizeof(x->skip_txfm));
+#endif
   super_block_uvrd(cpi, x, rate_tokenonly, distortion, skippable, &unused,
                    bsize, INT64_MAX);
   *rate = *rate_tokenonly +
@@ -2614,7 +2622,9 @@ static int64_t handle_inter_mode(
   int orig_dst_stride[MAX_MB_PLANE];
   int rs = 0;
   INTERP_FILTER best_filter = SWITCHABLE;
+#if !CONFIG_PVQ
   uint8_t skip_txfm[MAX_MB_PLANE << 2] = { 0 };
+#endif
   int64_t bsse[MAX_MB_PLANE << 2] = { 0 };
 
   int bsl = mi_width_log2_lookup[bsize];
@@ -2831,7 +2841,9 @@ static int64_t handle_inter_mode(
 
           skip_txfm_sb = tmp_skip_sb;
           skip_sse_sb = tmp_skip_sse;
+#if !CONFIG_PVQ
           memcpy(skip_txfm, x->skip_txfm, sizeof(skip_txfm));
+#endif
           memcpy(bsse, x->bsse, sizeof(bsse));
         }
       }//for (i = 0; i < SWITCHABLE_FILTERS; ++i) {
@@ -2862,17 +2874,21 @@ static int64_t handle_inter_mode(
     model_rd_for_sb(cpi, bsize, x, xd, &tmp_rate, &tmp_dist, &skip_txfm_sb,
                     &skip_sse_sb);
     rd = RDCOST(x->rdmult, x->rddiv, rs + tmp_rate, tmp_dist);
+#if !CONFIG_PVQ
     memcpy(skip_txfm, x->skip_txfm, sizeof(skip_txfm));
+#endif
     memcpy(bsse, x->bsse, sizeof(bsse));
   }
 
   if (!is_comp_pred) single_filter[this_mode][refs[0]] = mbmi->interp_filter;
 
+#if !CONFIG_PVQ
   if (cpi->sf.adaptive_mode_search)
     if (is_comp_pred)
       if (single_skippable[this_mode][refs[0]] &&
           single_skippable[this_mode][refs[1]])
         memset(skip_txfm, SKIP_TXFM_AC_DC, sizeof(skip_txfm));
+#endif
 
   if (cpi->sf.use_rd_breakout && ref_best_rd < INT64_MAX) {
     // if current pred_error modeled rd is substantially more than the best
@@ -2884,8 +2900,9 @@ static int64_t handle_inter_mode(
   }
 
   if (cm->interp_filter == SWITCHABLE) *rate2 += rs;
-
+#if !CONFIG_PVQ
   memcpy(x->skip_txfm, skip_txfm, sizeof(skip_txfm));
+#endif
   memcpy(x->bsse, bsse, sizeof(bsse));
 
   if (!skip_txfm_sb) {
@@ -3421,7 +3438,9 @@ void vp10_rd_pick_inter_mode_sb(VP10_COMP *cpi, TileDataEnc *tile_data,
     if (ref_frame == INTRA_FRAME) {
       TX_SIZE uv_tx;
       struct macroblockd_plane *const pd = &xd->plane[1];
+#if !CONFIG_PVQ
       memset(x->skip_txfm, 0, sizeof(x->skip_txfm));
+#endif
       super_block_yrd(cpi, x, &rate_y, &distortion_y, &skippable, NULL, bsize,
                       best_rd);
       if (rate_y == INT_MAX) continue;
@@ -4178,7 +4197,9 @@ void vp10_rd_pick_inter_mode_sub8x8(VP10_COMP *cpi, TileDataEnc *tile_data,
         // If even the 'Y' rd value of split is higher than best so far
         // then dont bother looking at UV
         vp10_build_inter_predictors_sbuv(&x->e_mbd, mi_row, mi_col, BLOCK_8X8);
+#if !CONFIG_PVQ
         memset(x->skip_txfm, SKIP_TXFM_NONE, sizeof(x->skip_txfm));
+#endif
         if (!super_block_uvrd(cpi, x, &rate_uv, &distortion_uv, &uv_skippable,
                               &uv_sse, BLOCK_8X8, tmp_best_rdu))
           continue;
