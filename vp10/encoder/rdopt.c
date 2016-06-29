@@ -469,7 +469,7 @@ static void dist_block(MACROBLOCK *x, int plane, int block, TX_SIZE tx_size,
       vp10_block_error(coeff, dqcoeff, 16 << ss_txfrm_size, &this_sse) >> shift;
 #else
   *out_dist =
-      vp10_block_error2(coeff, dqcoeff, ref_coeff, 16 << ss_txfrm_size, &this_sse)
+      vp10_block_error2_c(coeff, dqcoeff, ref_coeff, 16 << ss_txfrm_size, &this_sse)
         >> shift;
 #endif
 #endif  // CONFIG_VPX_HIGHBITDEPTH
@@ -1681,7 +1681,7 @@ static int64_t encode_inter_mb_segment(VP10_COMP *cpi, MACROBLOCK *x,
           vp10_block_error(coeff, BLOCK_OFFSET(pd->dqcoeff, k), 16, &ssz);
 #else
       thisdistortion +=
-          vp10_block_error2(coeff, BLOCK_OFFSET(pd->dqcoeff, k), ref_coeff, 16, &ssz);
+          vp10_block_error2_c(coeff, BLOCK_OFFSET(pd->dqcoeff, k), ref_coeff, 16, &ssz);
 #endif
 #endif  // CONFIG_VPX_HIGHBITDEPTH
       thissse += ssz;
