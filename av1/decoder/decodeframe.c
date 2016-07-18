@@ -1458,7 +1458,7 @@ static void daala_dec_init(daala_dec_ctx *daala_dec, od_ec_dec *ec) {
       sizeof(daala_dec->state.qm[0]));
   daala_dec->state.qm_inv = aom_calloc(OD_QM_BUFFER_SIZE,
       sizeof(daala_dec->state.qm_inv[0]));
-  daala_dec->qm = OD_FLAT_QM;
+  daala_dec->qm = OD_HVS_QM;
 
   od_init_qm(daala_dec->state.qm, daala_dec->state.qm_inv,
              daala_dec->qm == OD_HVS_QM ? OD_QM8_Q4_HVS : OD_QM8_Q4_FLAT);

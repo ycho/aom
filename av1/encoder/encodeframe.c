@@ -2774,7 +2774,7 @@ void av1_encode_tile(AV1_COMP *cpi, ThreadData *td, int tile_row,
       (int16_t *)aom_calloc(OD_QM_BUFFER_SIZE, sizeof(td->mb.daala_enc.state.qm[0]));
   td->mb.daala_enc.state.qm_inv =
       (int16_t *)aom_calloc(OD_QM_BUFFER_SIZE, sizeof(td->mb.daala_enc.state.qm_inv[0]));
-  td->mb.daala_enc.qm = OD_FLAT_QM;  // Hard coded. Enc/dec required to sync.
+  td->mb.daala_enc.qm = OD_HVS_QM;  // Hard coded. Enc/dec required to sync.
   td->mb.daala_enc.pvq_norm_lambda = OD_PVQ_LAMBDA;
 
   od_init_qm(td->mb.daala_enc.state.qm, td->mb.daala_enc.state.qm_inv,
