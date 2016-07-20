@@ -409,7 +409,7 @@ static int pvq_theta(od_coeff *out, const od_coeff *x0, const od_coeff *r0,
     od_apply_householder(xr, x16, r16, n);
     for (i = m; i < n - 1; i++) xr[i] = xr[i + 1];
     /* Search for the best gain within a reasonable range. */
-    for (i = OD_MAXI(1, gain_bound - 1); i < gain_bound + 1; i++) {
+    for (i = OD_MAXI(1, gain_bound - 1); i <= gain_bound + 1; i++) {
       int j;
       od_val32 qcg;
       int ts;
