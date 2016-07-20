@@ -399,7 +399,7 @@ static int pvq_theta(od_coeff *out, const od_coeff *x0, const od_coeff *r0,
     *max_theta = 0;
     noref = 0;
   }
-  if (n <= OD_MAX_PVQ_SIZE && !od_vector_is_null(r0, n) && corr > 0.3) {
+  if (n <= OD_MAX_PVQ_SIZE && !od_vector_is_null(r0, n) && corr > 0.7) {
     od_val16 xr[MAXN];
     int gain_bound;
     gain_bound = OD_SHR(cg - gain_offset, OD_CGAIN_SHIFT);
@@ -461,7 +461,7 @@ static int pvq_theta(od_coeff *out, const od_coeff *x0, const od_coeff *r0,
      correlation. The only exception is luma on a keyframe because
      H/V prediction is unreliable. */
   if (n <= OD_MAX_PVQ_SIZE &&
-   ((is_keyframe && pli == 0) || corr < .7
+   ((is_keyframe && pli == 0) || corr < .9
    || cg < (od_val32)(OD_SHL(2, OD_CGAIN_SHIFT)))) {
     int gain_bound;
     gain_bound = OD_SHR(cg, OD_CGAIN_SHIFT);
