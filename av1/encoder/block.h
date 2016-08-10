@@ -168,6 +168,10 @@ struct macroblock {
   PVQ_INFO pvq[256][3]; // 16x16 of 4x4 blocks, YUV
   daala_enc_ctx daala_enc;
 #endif
+
+#if CONFIG_DUMP_COEFF
+  int is_rdo;
+#endif
 };
 
 #ifdef __cplusplus

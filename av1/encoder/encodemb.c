@@ -806,6 +806,7 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
 
 #if !CONFIG_PVQ
   fwd_txfm(src_diff, coeff, diff_stride, &fwd_txfm_param);
+
   switch (tx_size) {
     case TX_32X32:
       aom_quantize_b_32x32(coeff, 1024, x->skip_block, p->zbin, p->round,
@@ -854,6 +855,24 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
 
   fwd_txfm(src_int16, coeff, diff_stride, &fwd_txfm_param);
   fwd_txfm(pred, ref_coeff, diff_stride, &fwd_txfm_param);
+
+#if CONFIG_DUMP_COEFF
+  // dump tx coeff only when RDO is off.
+  // dump for tx sizes, 4x4, 8x8, 16x16 only.
+  // the format of data dump follows what metajack did Oct 2014 for pvq
+  // plus tx type. see below for metajack's octave codes to parse the format
+  // https://review.xiph.org/498/patch/784/3103
+  if (!x->is_rdo && (tx_blk_size <= 16)) {
+    int i, j;
+
+    printf("%d %d ", tx_blk_size, tx_type);
+    for (j = 0; j < tx_blk_size; j++) {
+      for (i = 0; i < tx_blk_size; i++)
+      printf("%d ", coeff[j * tx_blk_size + i]);
+    }
+    printf("\n");
+  }
+#endif
 
   // PVQ for inter mode block
   if (!x->skip_block)
@@ -1300,6 +1319,23 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   fwd_txfm(src_int16, coeff, diff_stride, &fwd_txfm_param);
   fwd_txfm(pred, ref_coeff, diff_stride, &fwd_txfm_param);
 
+#if CONFIG_DUMP_COEFF
+  // dump tx coeff only when RDO is off.
+  // dump for tx sizes, 4x4, 8x8, 16x16 only.
+  // the format of data dump follows what metajack did Oct 2014 for pvq
+  // plus tx type. see below for metajack's octave codes to parse the format
+  // https://review.xiph.org/498/patch/784/3103
+  if (!x->is_rdo && (tx_blk_size <= 16) ) {
+    int i, j;
+
+    printf("%d %d ", tx_blk_size, tx_type);
+    for (j = 0; j < tx_blk_size; j++) {
+      for (i = 0; i < tx_blk_size; i++)
+      printf("%d ", coeff[j * tx_blk_size + i]);
+    }
+    printf("\n");
+  }
+#endif
 
   // PVQ for intra mode block
   if (!x->skip_block)
