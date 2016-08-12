@@ -871,6 +871,9 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
       printf("%d ", coeff[j * tx_blk_size + i]);
     }
     printf("\n");
+    /*if (tx_type != ADST_ADST) {
+      int a = 0;
+    }*/
   }
 #endif
 
@@ -1334,6 +1337,9 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
       printf("%d ", coeff[j * tx_blk_size + i]);
     }
     printf("\n");
+    /*if (tx_type != ADST_ADST) {
+      int a = 0;
+    }*/
   }
 #endif
 

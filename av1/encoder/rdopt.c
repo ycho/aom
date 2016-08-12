@@ -757,6 +757,9 @@ static void choose_largest_tx_size(const AV1_COMP *const cpi, MACROBLOCK *x,
   if (mbmi->tx_size < TX_32X32 && !xd->lossless[mbmi->segment_id]) {
 #if CONFIG_DUMP_COEFF
     for (tx_type = 0; tx_type < TX_TYPES; ++tx_type) {
+      // To dump tx coeffs for each tx_type, replace below ADST_ADST with the desired tx_type
+      if (tx_type != ADST_ADST)
+        continue;
 #else
     for (tx_type = 0; tx_type < 1; ++tx_type) {
 #endif
