@@ -882,7 +882,12 @@ static void choose_tx_size_from_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
         else
           r_tx_size += av1_cost_one(tx_probs[m]);
       }
-
+#if CONFIG_DUMP_COEFF
+      // To dump tx coeffs for each tx_type, replace below ADST_ADST with the desired tx_type
+      if (n <= TX_16X16 && tx_type != ADST_ADST) {
+        continue;
+      }
+#endif
       if (n >= TX_32X32 && tx_type != DCT_DCT) {
         continue;
       }

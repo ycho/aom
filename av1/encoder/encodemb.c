@@ -862,7 +862,7 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
   // the format of data dump follows what metajack did Oct 2014 for pvq
   // plus tx type. see below for metajack's octave codes to parse the format
   // https://review.xiph.org/498/patch/784/3103
-  if (!x->is_rdo && (tx_blk_size <= 16)) {
+  if (!x->is_rdo && (tx_blk_size <= 16) && (plane == 0)) {
     int i, j;
 
     printf("%d %d ", tx_blk_size, tx_type);
@@ -1325,7 +1325,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   // the format of data dump follows what metajack did Oct 2014 for pvq
   // plus tx type. see below for metajack's octave codes to parse the format
   // https://review.xiph.org/498/patch/784/3103
-  if (!x->is_rdo && (tx_blk_size <= 16) ) {
+  if (!x->is_rdo && (tx_blk_size <= 16) && (plane == 0)) {
     int i, j;
 
     printf("%d %d ", tx_blk_size, tx_type);
