@@ -75,11 +75,21 @@ extern const uint16_t LAPLACE_OFFSET[];
 #define OD_QM_BUFFER_SIZE (2*OD_QM_STRIDE)
 
 #if !defined(OD_FLOAT_PVQ)
-#define OD_THETA_SCALE (32768*2./M_PI)
+#define OD_THETA_SHIFT (15)
+#define OD_THETA_SCALE ((1 << OD_THETA_SHIFT)*2./M_PI)
+#define OD_MAX_THETA_SCALE (1 << OD_THETA_SHIFT)
 #define OD_TRIG_SCALE (32768)
+#define OD_BETA_SHIFT (12)
+#define OD_BETA_SCALE_1 (1./(1 << OD_BETA_SHIFT))
+/*Multiplies 16-bit a by 32-bit b and keeps bits [16:64-OD_BETA_SHIFT-1].*/
+#define OD_MULT16_32_QBETA(a, b) \
+ ((int16_t)(a)*(int64_t)(int32_t)(b) >> OD_BETA_SHIFT)
+# define OD_MULT16_16_QBETA(a, b) \
+  ((((int16_t)(a))*((int32_t)(int16_t)(b))) >> OD_BETA_SHIFT)
 #define OD_CGAIN_SHIFT (8)
 #define OD_CGAIN_SCALE (1 << OD_CGAIN_SHIFT)
 #else
+#define OD_BETA_SCALE_1 (1.)
 #define OD_THETA_SCALE (1)
 #define OD_TRIG_SCALE (1)
 #define OD_CGAIN_SCALE (1)
@@ -145,7 +155,7 @@ int od_vector_log_mag(const od_coeff *x, int n);
 
 int od_qm_get_index(int bs, int band);
 
-extern const double *const OD_PVQ_BETA[2][OD_NPLANES_MAX][OD_NBSIZES + 1];
+extern const od_val16 *const OD_PVQ_BETA[2][OD_NPLANES_MAX][OD_NBSIZES + 1];
 
 void od_init_qm(int16_t *x, int16_t *x_inv, const int *qm);
 int od_compute_householder(od_val16 *r, int n, od_val32 gr, int *sign,
@@ -157,13 +167,13 @@ void od_pvq_synthesis_partial(od_coeff *xcoeff, const od_coeff *ypulse,
                                   int noref, od_val32 g,
                                   od_val32 theta, int m, int s,
                                   const int16_t *qm_inv);
-od_val32 od_gain_expand(od_val32 cg, int q0, double beta);
+od_val32 od_gain_expand(od_val32 cg, int q0, od_val16 beta);
 od_val32 od_pvq_compute_gain(const od_val16 *x, int n, int q0, od_val32 *g,
- double beta, int bshift);
-int od_pvq_compute_max_theta(od_val32 qcg, double beta);
+ od_val16 beta, int bshift);
+int od_pvq_compute_max_theta(od_val32 qcg, od_val16 beta);
 od_val32 od_pvq_compute_theta(int t, int max_theta);
 int od_pvq_compute_k(od_val32 qcg, int itheta, od_val32 theta, int noref,
- int n, double beta, int nodesync);
+ int n, od_val16 beta, int nodesync);
 
 int od_vector_is_null(const od_coeff *x, int len);
 int od_qm_offset(int bs, int xydec);

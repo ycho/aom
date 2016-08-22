@@ -133,7 +133,7 @@ static void pvq_decode_partition(od_ec_dec *ec,
                                  od_coeff *ref,
                                  od_coeff *out,
                                  int *noref,
-                                 double beta,
+                                 od_val16 beta,
                                  int robust,
                                  int is_keyframe,
                                  int pli,
@@ -219,7 +219,7 @@ static void pvq_decode_partition(od_ec_dec *ec,
 #endif
   for (i = 0; i < n; i++) {
 #if defined(OD_FLOAT_PVQ)
-    ref16[i] = ref[i]*qm[i]*OD_QM_SCALE_1;
+    ref16[i] = ref[i]*(double)qm[i]*OD_QM_SCALE_1;
 #else
     ref16[i] = OD_SHR_ROUND(ref[i]*qm[i], OD_QM_SHIFT + rshift);
 #endif
@@ -308,7 +308,7 @@ void od_pvq_decode(daala_dec_ctx *dec,
                    int q0,
                    int pli,
                    int bs,
-                   const double *beta,
+                   const od_val16 *beta,
                    int robust,
                    int is_keyframe,
                    unsigned int *flags,
