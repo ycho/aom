@@ -45,7 +45,7 @@ int pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
                       tran_low_t *ref_coeff, tran_low_t *const dqcoeff,
                       uint16_t *eob, const int16_t *quant, int plane,
                       int tx_size, TX_TYPE tx_type, int *rate,
-                      PVQ_INFO *pvq_info);
+                      int speed, PVQ_INFO *pvq_info);
 
 void store_pvq_enc_info(PVQ_INFO *pvq_info, int *qg, int *theta, int *max_theta,
                         int *k, od_coeff *y, int nb_bands, const int *off,

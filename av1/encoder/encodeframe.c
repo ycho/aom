@@ -1013,6 +1013,10 @@ static void rd_pick_sb_modes(const AV1_COMP *const cpi, TileDataEnc *tile_data,
   // Use the lower precision, but faster, 32x32 fdct for mode selection.
   x->use_lp32x32fdct = 1;
 
+#if CONFIG_PVQ
+  x->speed = 1;
+#endif
+
   set_offsets(cpi, tile_info, x, mi_row, mi_col, bsize);
   mbmi = &xd->mi[0]->mbmi;
   mbmi->sb_type = bsize;
@@ -3109,6 +3113,13 @@ static void encode_superblock(const AV1_COMP *const cpi, ThreadData *td,
   memset(x->skip_txfm, 0, sizeof(x->skip_txfm));
 
   x->use_lp32x32fdct = cpi->sf.use_lp32x32fdct;
+
+#if CONFIG_PVQ
+  if (output_enabled)
+    x->speed = 0;
+  else
+    x->speed = 1;
+#endif
 
   if (!is_inter_block(mbmi)) {
     int plane;

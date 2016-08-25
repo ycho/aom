@@ -160,6 +160,7 @@ struct macroblock {
   PVQ_QUEUE *pvq_q;
   PVQ_INFO pvq[256][3];  // 16x16 of 4x4 blocks, YUV
   daala_enc_ctx daala_enc;
+  int speed;
 #endif
 };
 

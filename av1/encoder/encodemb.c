@@ -562,6 +562,7 @@ void av1_xform_quant_fp(MACROBLOCK *x, int plane, int block, int blk_row,
                              tx_size,      // block size in log_2 - 2
                              tx_type,
                              &x->rate,   // rate measured
+                             x->speed,
                              pvq_info);  // PVQ info for a block
 
   x->pvq_skip[plane] = skip;
@@ -869,6 +870,7 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
                              tx_size,      // block size in log_2 - 2
                              tx_type,
                              &x->rate,   // rate measured
+                             x->speed,
                              pvq_info);  // PVQ info for a block
 
   x->pvq_skip[plane] = skip;
@@ -1301,6 +1303,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
                              tx_size,      // block size in log_2 - 2
                              tx_type,
                              &x->rate,   // rate measured
+                             x->speed,
                              pvq_info);  // PVQ info for a block
 
   x->pvq_skip[plane] = skip;
@@ -1359,7 +1362,7 @@ int pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
                       tran_low_t *ref_coeff, tran_low_t *const dqcoeff,
                       uint16_t *eob, const int16_t *quant, int plane,
                       int tx_size, TX_TYPE tx_type, int *rate,
-                      PVQ_INFO *pvq_info) {
+                      int speed, PVQ_INFO *pvq_info) {
   const int tx_blk_size = 1 << (tx_size + 2);
   int skip;
   // TODO: Enable this later, if pvq_qm_q4 is available in AOM.
@@ -1412,7 +1415,7 @@ int pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
       0,        // is_keyframe,
       0, 0, 0,  // q_scaling, bx, by,
       daala_enc->state.qm + off, daala_enc->state.qm_inv + off,
-      0, // speed
+      speed, // speed
       pvq_info);
 
   if (skip && pvq_info) assert(pvq_info->ac_dc_coded == 0);
