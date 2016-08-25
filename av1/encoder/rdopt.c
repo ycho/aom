@@ -672,9 +672,6 @@ static void choose_largest_tx_size(const AV1_COMP *const cpi, MACROBLOCK *x,
   int s0 = av1_cost_bit(skip_prob, 0);
   int s1 = av1_cost_bit(skip_prob, 1);
   const int is_inter = is_inter_block(mbmi);
-#if CONFIG_PVQ
-  od_rollback_buffer buf;
-#endif
 
   *distortion = INT64_MAX;
   *rate = INT_MAX;
@@ -683,18 +680,20 @@ static void choose_largest_tx_size(const AV1_COMP *const cpi, MACROBLOCK *x,
 
   mbmi->tx_size = AOMMIN(max_tx_size, largest_tx_size);
 
+  if (mbmi->tx_size < TX_32X32 && !xd->lossless[mbmi->segment_id]) {
 #if CONFIG_PVQ
-  if (mbmi->tx_size < TX_32X32 && !xd->lossless[mbmi->segment_id])
-    od_encode_checkpoint(&x->daala_enc, &buf);
+    od_rollback_buffer pre_buf, post_buf;
+
+    od_encode_checkpoint(&x->daala_enc, &pre_buf);
+    od_encode_checkpoint(&x->daala_enc, &post_buf);
 #endif
 
-  if (mbmi->tx_size < TX_32X32 && !xd->lossless[mbmi->segment_id]) {
     for (tx_type = DCT_DCT; tx_type < TX_TYPES; ++tx_type) {
       mbmi->tx_type = tx_type;
       txfm_rd_in_plane(x, &r, &d, &s, &psse, ref_best_rd, 0, bs, mbmi->tx_size,
                        cpi->sf.use_fast_coef_costing);
 #if CONFIG_PVQ
-      od_encode_rollback(&x->daala_enc, &buf);
+      od_encode_rollback(&x->daala_enc, &pre_buf);
 #endif
       if (r == INT_MAX) continue;
       if (is_inter)
@@ -717,8 +716,14 @@ static void choose_largest_tx_size(const AV1_COMP *const cpi, MACROBLOCK *x,
         *rate = r;
         *skip = s;
         *sse = psse;
+#if CONFIG_PVQ
+        od_encode_checkpoint(&x->daala_enc, &post_buf);
+#endif
       }
     }
+#if CONFIG_PVQ
+    od_encode_rollback(&x->daala_enc, &post_buf);
+#endif
   } else {
     txfm_rd_in_plane(x, rate, distortion, skip, sse, ref_best_rd, 0, bs,
                      mbmi->tx_size, cpi->sf.use_fast_coef_costing);
