@@ -961,7 +961,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   // pass blank dummy image to av1_inv_txfm_add_*x*(), i.e. set dst as zeros
   for (j = 0; j < tx_blk_size; j++)
     for (i = 0; i < tx_blk_size; i++)
-      dst[j * pd->dst.stride + i] -= dst[j * pd->dst.stride + i];
+      memset(dst + j * pd->dst.stride, 0, tx_blk_size);
 #endif
 
 #if CONFIG_AOM_HIGHBITDEPTH
@@ -1318,7 +1318,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   if (!skip) {
     for (j = 0; j < tx_blk_size; j++)
       for (i = 0; i < tx_blk_size; i++)
-        dst[j * dst_stride + i] -= dst[j * dst_stride + i];
+        memset(dst + j * dst_stride, 0, tx_blk_size);
 
     switch (tx_size) {
       case TX_32X32:
