@@ -3115,7 +3115,7 @@ static void encode_superblock(const AV1_COMP *const cpi, ThreadData *td,
   x->use_lp32x32fdct = cpi->sf.use_lp32x32fdct;
 
 #if CONFIG_PVQ
-    x->pvq_speed = 0;
+  x->pvq_speed = 0;
 #endif
 
   if (!is_inter_block(mbmi)) {

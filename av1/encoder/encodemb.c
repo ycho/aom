@@ -561,7 +561,7 @@ void av1_xform_quant_fp(MACROBLOCK *x, int plane, int block, int blk_row,
                              plane,        // image plane
                              tx_size,      // block size in log_2 - 2
                              tx_type,
-                             &x->rate,   // rate measured
+                             &x->rate,  // rate measured
                              x->pvq_speed,
                              pvq_info);  // PVQ info for a block
 
@@ -869,7 +869,7 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
                              plane,        // image plane
                              tx_size,      // block size in log_2 - 2
                              tx_type,
-                             &x->rate,   // rate measured
+                             &x->rate,  // rate measured
                              x->pvq_speed,
                              pvq_info);  // PVQ info for a block
 
@@ -1302,7 +1302,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
                              plane,        // image plane
                              tx_size,      // block size in log_2 - 2
                              tx_type,
-                             &x->rate,   // rate measured
+                             &x->rate,  // rate measured
                              x->pvq_speed,
                              pvq_info);  // PVQ info for a block
 

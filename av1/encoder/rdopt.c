@@ -2112,7 +2112,8 @@ static int64_t encode_inter_mb_segment(const AV1_COMP *const cpi, MACROBLOCK *x,
       fwd_txm4x4(pred, ref_coeff, diff_stride);
 
       pvq_encode_helper(&x->daala_enc, coeff, ref_coeff, dqcoeff, &p->eobs[k],
-                        pd->dequant, 0, TX_4X4, tx_type, &rate_pvq, x->pvq_speed, NULL);
+                        pd->dequant, 0, TX_4X4, tx_type, &rate_pvq,
+                        x->pvq_speed, NULL);
 #endif
 
 #if CONFIG_AOM_HIGHBITDEPTH
