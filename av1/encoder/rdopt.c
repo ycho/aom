@@ -1133,7 +1133,7 @@ static int64_t rd_pick_intra4x4block(const AV1_COMP *const cpi, MACROBLOCK *x,
           if (!skip) {
             for (j = 0; j < tx_blk_size; j++)
               for (i = 0; i < tx_blk_size; i++)
-                dst[j * dst_stride + i] -= dst[j * dst_stride + i];
+                dst[j * dst_stride + i] = 0;
 #endif
             av1_inv_txfm_add_4x4(BLOCK_OFFSET(pd->dqcoeff, block), dst,
                                  dst_stride, p->eobs[block], DCT_DCT, 1);
@@ -1167,7 +1167,7 @@ static int64_t rd_pick_intra4x4block(const AV1_COMP *const cpi, MACROBLOCK *x,
           if (!skip) {
             for (j = 0; j < tx_blk_size; j++)
               for (i = 0; i < tx_blk_size; i++)
-                dst[j * dst_stride + i] -= dst[j * dst_stride + i];
+                dst[j * dst_stride + i] = 0;
 #endif
             av1_inv_txfm_add_4x4(BLOCK_OFFSET(pd->dqcoeff, block), dst,
                                  dst_stride, p->eobs[block], tx_type, 0);

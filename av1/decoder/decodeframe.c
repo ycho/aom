@@ -540,7 +540,7 @@ static void predict_and_reconstruct_intra_block(MACROBLOCKD *const xd,
       if (eob > 0) {
         for (j = 0; j < tx_blk_size; j++)
           for (i = 0; i < tx_blk_size; i++)
-            dst[j * pd->dst.stride + i] -= dst[j * pd->dst.stride + i];
+            dst[j * pd->dst.stride + i] = 0;
 #endif
     inverse_transform_block_intra(xd, plane, tx_type, tx_size, dst,
                                   pd->dst.stride, eob);
@@ -620,7 +620,7 @@ static int reconstruct_inter_block(MACROBLOCKD *const xd, aom_reader *r,
     if (eob > 0) {
       for (j = 0; j < tx_blk_size; j++)
         for (i = 0; i < tx_blk_size; i++)
-          dst[j * pd->dst.stride + i] -= dst[j * pd->dst.stride + i];
+          dst[j * pd->dst.stride + i] = 0;
 #endif
   inverse_transform_block_inter(
       xd, plane, tx_size, &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
