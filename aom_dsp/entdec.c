@@ -435,7 +435,7 @@ uint32_t od_ec_dec_uint(od_ec_dec *dec, uint32_t ft) {
     ftb = OD_ILOG_NZ(ft) - OD_EC_UINT_BITS;
     ft1 = (int)(ft >> ftb) + 1;
     t = od_ec_decode_cdf_q15(dec, OD_UNIFORM_CDF_Q15(ft1), ft1);
-    t = t << ftb | od_ec_dec_bits(dec, ftb);
+    t = t << ftb | od_ec_dec_bits(dec, ftb, "");
     if (t <= ft) return t;
     dec->error = 1;
     return ft;
@@ -448,7 +448,7 @@ uint32_t od_ec_dec_uint(od_ec_dec *dec, uint32_t ft) {
   ftb: The number of bits to extract.
        This must be between 0 and 25, inclusive.
   Return: The decoded bits.*/
-uint32_t od_ec_dec_bits(od_ec_dec *dec, unsigned ftb) {
+uint32_t od_ec_dec_bits_(od_ec_dec *dec, unsigned ftb) {
   od_ec_window window;
   int available;
   uint32_t ret;

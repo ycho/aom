@@ -33,6 +33,14 @@ extern "C" {
 
 typedef struct od_ec_dec od_ec_dec;
 
+#if OD_ACCOUNTING
+#define OD_ACC_STR , char *acc_str
+#define od_ec_dec_bits(dec, ftb, str) od_ec_dec_bits_(dec, ftb, str)
+#else
+#define OD_ACC_STR
+#define od_ec_dec_bits(dec, ftb, str) od_ec_dec_bits_(dec, ftb)
+#endif
+
 /*The entropy decoder context.*/
 struct od_ec_dec {
   /*The start of the current input buffer.*/
@@ -91,7 +99,7 @@ OD_WARN_UNUSED_RESULT int od_ec_decode_cdf_unscaled_dyadic(od_ec_dec *dec,
 OD_WARN_UNUSED_RESULT uint32_t od_ec_dec_uint(od_ec_dec *dec, uint32_t ft)
     OD_ARG_NONNULL(1);
 
-OD_WARN_UNUSED_RESULT uint32_t od_ec_dec_bits(od_ec_dec *dec, unsigned ftb)
+OD_WARN_UNUSED_RESULT uint32_t od_ec_dec_bits_(od_ec_dec *dec, unsigned ftb)
     OD_ARG_NONNULL(1);
 
 OD_WARN_UNUSED_RESULT int od_ec_dec_tell(const od_ec_dec *dec)

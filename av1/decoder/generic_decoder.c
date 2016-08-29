@@ -56,7 +56,7 @@ int od_decode_cdf_adapt_q15_(od_ec_dec *ec, uint16_t *cdf, int n,
       cdf[i] = cdf[i]*32768/ft;
     }
   }
-  val = od_ec_decode_cdf_q15(ec, cdf, n, acc_str);
+  val = od_ec_decode_cdf_q15(ec, cdf, n);
   od_cdf_adapt_q15(val, cdf, n, count, rate);
   return val;
 }
@@ -75,7 +75,7 @@ int od_decode_cdf_adapt_(od_ec_dec *ec, uint16_t *cdf, int n,
  int increment OD_ACC_STR) {
   int i;
   int val;
-  val = od_ec_decode_cdf_unscaled(ec, cdf, n, acc_str);
+  val = od_ec_decode_cdf_unscaled(ec, cdf, n);
   if (cdf[n-1] + increment > 32767) {
     for (i = 0; i < n; i++) {
       /* Second term ensures that the pdf is non-null */
@@ -120,8 +120,8 @@ int generic_decode_(od_ec_dec *dec, generic_encoder *model, int max,
   id = OD_MINI(GENERIC_TABLES - 1, lg_q1);
   cdf = model->cdf[id];
   ms = (max + (1 << shift >> 1)) >> shift;
-  if (max == -1) xs = od_ec_decode_cdf_unscaled(dec, cdf, 16, acc_str);
-  else xs = od_ec_decode_cdf_unscaled(dec, cdf, OD_MINI(ms + 1, 16), acc_str);
+  if (max == -1) xs = od_ec_decode_cdf_unscaled(dec, cdf, 16);
+  else xs = od_ec_decode_cdf_unscaled(dec, cdf, OD_MINI(ms + 1, 16));
   if (xs == 15) {
     int e;
     unsigned decay;

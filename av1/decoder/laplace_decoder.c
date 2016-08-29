@@ -132,9 +132,9 @@ int laplace_decode_special_(od_ec_dec *dec, unsigned decay, int max OD_ACC_STR) 
     }
     if (ms > 0 && ms < 15) {
       /* Simple way of truncating the pdf when we have a bound. */
-      sym = od_ec_decode_cdf_unscaled(dec, cdf, ms + 1, acc_str);
+      sym = od_ec_decode_cdf_unscaled(dec, cdf, ms + 1);
     }
-    else sym = od_ec_decode_cdf_q15(dec, cdf, 16, acc_str);
+    else sym = od_ec_decode_cdf_q15(dec, cdf, 16);
     xs += sym;
     ms -= 15;
   }
@@ -180,7 +180,7 @@ int laplace_decode_(od_ec_dec *dec, unsigned ex_q8, int k OD_ACC_STR) {
   }
   /* Simple way of truncating the pdf when we have a bound */
   if (k == 0) sym = 0;
-  else sym = od_ec_decode_cdf_unscaled(dec, cdf, OD_MINI(k + 1, 16), acc_str);
+  else sym = od_ec_decode_cdf_unscaled(dec, cdf, OD_MINI(k + 1, 16));
   if (shift) {
     int special;
     /* Because of the rounding, there's only half the number of possibilities
