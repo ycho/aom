@@ -520,7 +520,7 @@ void av1_xform_quant_fp(MACROBLOCK *x, int plane, int block, int blk_row,
       break;
     default: assert(0); break;
   }
-#else   //#if !CONFIG_PVQ
+#else   // #if !CONFIG_PVQ
   switch (tx_size) {
     case TX_32X32:
       // NOTE: Using x->use_lp32x32fdct == 1 will makes enc and dec mismatched,
@@ -568,7 +568,7 @@ void av1_xform_quant_fp(MACROBLOCK *x, int plane, int block, int blk_row,
   x->pvq_skip[plane] = skip;
 
   if (!skip) mbmi->skip = 0;
-#endif  //#if !CONFIG_PVQ
+#endif  // #if !CONFIG_PVQ
 }
 
 void av1_xform_quant_dc(MACROBLOCK *x, int plane, int block, int blk_row,
@@ -852,7 +852,7 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
       break;
     default: assert(0); break;
   }
-#else   //#if !CONFIG_PVQ
+#else   // #if !CONFIG_PVQ
   fwd_txfm_param.rd_transform = 0;
 
   fwd_txfm(src_int16, coeff, diff_stride, &fwd_txfm_param);
@@ -876,7 +876,7 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
   x->pvq_skip[plane] = skip;
 
   if (!skip) mbmi->skip = 0;
-#endif  //#if !CONFIG_PVQ
+#endif  // #if !CONFIG_PVQ
 }
 
 static void encode_block(int plane, int block, int blk_row, int blk_col,
@@ -1274,7 +1274,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
       break;
     default: assert(0); break;
   }
-#else   //#if !CONFIG_PVQ
+#else   // #if !CONFIG_PVQ
   // transform block size in pixels
   tx_blk_size = 1 << (tx_size + 2);
 
@@ -1340,7 +1340,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
       default: assert(0); break;
     }
   }
-#endif  //#if !CONFIG_PVQ
+#endif  // #if !CONFIG_PVQ
 
 #if !CONFIG_PVQ
   if (*eob) *(args->skip) = 0;
@@ -1365,7 +1365,7 @@ int pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
                       int speed, PVQ_INFO *pvq_info) {
   const int tx_blk_size = 1 << (tx_size + 2);
   int skip;
-  // TODO: Enable this later, if pvq_qm_q4 is available in AOM.
+  // TODO(yushin): Enable this later, if pvq_qm_q4 is available in AOM.
   // int pvq_dc_quant = OD_MAXI(1,
   //  quant * daala_enc->state.pvq_qm_q4[plane][od_qm_get_index(tx_size, 0)] >>
   //  4);
