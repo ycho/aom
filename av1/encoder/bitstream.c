@@ -395,14 +395,14 @@ static void pack_mb_tokens(aom_writer *w, TOKENEXTRA **tp,
   while (p < stop && p->token != EOSB_TOKEN) {
     const uint8_t token = p->token;
     aom_tree_index index = 0;
-#if !CONFIG_RANS
+#if !CONFIG_RANS && !CONFIG_DAALA_EC
     const struct av1_token *const coef_encoding = &av1_coef_encodings[token];
     int coef_value = coef_encoding->value;
     int coef_length = coef_encoding->len;
 #endif  // !CONFIG_RANS
     const av1_extra_bit *const extra_bits = &extra_bits_table[token];
 
-#if CONFIG_RANS
+#if CONFIG_RANS || CONFIG_DAALA_EC
     if (!p->skip_eob_node) aom_write(w, token != EOB_TOKEN, p->context_tree[0]);
 
     if (token != EOB_TOKEN) {
@@ -487,8 +487,13 @@ static void pack_mb_tokens(aom_writer *w, TOKENEXTRA **tp,
 static void write_segment_id(aom_writer *w, const struct segmentation *seg,
                              const struct segmentation_probs *segp,
                              int segment_id) {
-  if (seg->enabled && seg->update_map)
+  if (seg->enabled && seg->update_map) {
+#if CONFIG_DAALA_EC
+    aom_write_symbol(w, segment_id, segp->tree_cdf, MAX_SEGMENTS);
+#else
     aom_write_tree(w, av1_segment_tree, segp->tree_probs, segment_id, 3, 0);
+#endif
+  }
 }
 
 // This function encodes the reference frame
@@ -1359,7 +1364,7 @@ static void update_coef_probs_common(aom_writer *const bc, AV1_COMP *cpi,
     }
     default: assert(0);
   }
-#if CONFIG_RANS
+#if CONFIG_RANS || CONFIG_DAALA_EC
   av1_coef_pareto_cdfs(cpi->common.fc);
 #endif  // CONFIG_RANS
 }
@@ -1368,7 +1373,7 @@ static void update_coef_probs(AV1_COMP *cpi, aom_writer *w) {
   const TX_MODE tx_mode = cpi->common.tx_mode;
   const TX_SIZE max_tx_size = tx_mode_to_biggest_tx_size[tx_mode];
   TX_SIZE tx_size;
-  for (tx_size = TX_4X4; tx_size <= max_tx_size; ++tx_size) {
+  for (tx_size = 0; tx_size <= max_tx_size; ++tx_size) {
     av1_coeff_stats frame_branch_ct[PLANE_TYPES];
     av1_coeff_probs_model frame_coef_probs[PLANE_TYPES];
     if (cpi->td.counts->tx.tx_totals[tx_size] <= 20 ||
@@ -1435,7 +1440,7 @@ static void encode_clpf(const AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
       // 50% probability, so a more efficient coding is possible.
       aom_wb_write_literal(wb, cm->clpf_numblocks, av1_clpf_maxbits(cm));
       for (i = 0; i < cm->clpf_numblocks; i++) {
-        aom_wb_write_literal(wb, cm->clpf_blocks[i], 1);
+        aom_wb_write_literal(wb, cm->clpf_blocks ? cm->clpf_blocks[i] : 0, 1);
       }
     }
   }
@@ -1566,6 +1571,10 @@ static void update_seg_probs(AV1_COMP *cpi, aom_writer *w) {
     prob_diff_update(av1_segment_tree, cm->fc->seg.tree_probs,
                      cm->counts.seg.tree_total, MAX_SEGMENTS, w);
   }
+#if CONFIG_DAALA_EC
+  av1_tree_to_cdf(av1_segment_tree, cm->fc->seg.tree_probs,
+                  cm->fc->seg.tree_cdf);
+#endif
 }
 
 static void write_txfm_mode(TX_MODE mode, struct aom_write_bit_buffer *wb) {
@@ -1589,20 +1598,20 @@ static void update_txfm_probs(AV1_COMMON *cm, aom_writer *w,
 
     for (i = 0; i < TX_SIZE_CONTEXTS; i++) {
       av1_tx_counts_to_branch_counts_8x8(counts->tx.p8x8[i], ct_8x8p);
-      for (j = 0; j < TX_SIZES - 3; j++)
+      for (j = TX_4X4; j < TX_SIZES - 3; j++)
         av1_cond_prob_diff_update(w, &cm->fc->tx_probs.p8x8[i][j], ct_8x8p[j]);
     }
 
     for (i = 0; i < TX_SIZE_CONTEXTS; i++) {
       av1_tx_counts_to_branch_counts_16x16(counts->tx.p16x16[i], ct_16x16p);
-      for (j = 0; j < TX_SIZES - 2; j++)
+      for (j = TX_4X4; j < TX_SIZES - 2; j++)
         av1_cond_prob_diff_update(w, &cm->fc->tx_probs.p16x16[i][j],
                                   ct_16x16p[j]);
     }
 
     for (i = 0; i < TX_SIZE_CONTEXTS; i++) {
       av1_tx_counts_to_branch_counts_32x32(counts->tx.p32x32[i], ct_32x32p);
-      for (j = 0; j < TX_SIZES - 1; j++)
+      for (j = TX_4X4; j < TX_SIZES - 1; j++)
         av1_cond_prob_diff_update(w, &cm->fc->tx_probs.p32x32[i][j],
                                   ct_32x32p[j]);
     }

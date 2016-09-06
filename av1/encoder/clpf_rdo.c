@@ -10,24 +10,25 @@
  */
 
 #include "av1/common/clpf.h"
+#include "./aom_dsp_rtcd.h"
 #include "aom/aom_integer.h"
 #include "av1/common/quant_common.h"
 
 // Calculate the error of a filtered and unfiltered block
-static void detect_clpf(const uint8_t *rec, const uint8_t *org, int x0, int y0,
-                        int width, int height, int so, int stride, int *sum0,
-                        int *sum1, unsigned int strength) {
+void aom_clpf_detect_c(const uint8_t *rec, const uint8_t *org, int rstride,
+                       int ostride, int x0, int y0, int width, int height,
+                       int *sum0, int *sum1, unsigned int strength) {
   int x, y;
   for (y = y0; y < y0 + 8; y++) {
     for (x = x0; x < x0 + 8; x++) {
-      int O = org[y * so + x];
-      int X = rec[y * stride + x];
-      int A = rec[AOMMAX(0, y - 1) * stride + x];
-      int B = rec[y * stride + AOMMAX(0, x - 2)];
-      int C = rec[y * stride + AOMMAX(0, x - 1)];
-      int D = rec[y * stride + AOMMIN(width - 1, x + 1)];
-      int E = rec[y * stride + AOMMIN(width - 1, x + 2)];
-      int F = rec[AOMMIN(height - 1, y + 1) * stride + x];
+      int O = org[y * ostride + x];
+      int X = rec[y * rstride + x];
+      int A = rec[AOMMAX(0, y - 1) * rstride + x];
+      int B = rec[y * rstride + AOMMAX(0, x - 2)];
+      int C = rec[y * rstride + AOMMAX(0, x - 1)];
+      int D = rec[y * rstride + AOMMIN(width - 1, x + 1)];
+      int E = rec[y * rstride + AOMMIN(width - 1, x + 2)];
+      int F = rec[AOMMIN(height - 1, y + 1) * rstride + x];
       int delta = av1_clpf_sample(X, A, B, C, D, E, F, strength);
       int Y = X + delta;
       *sum0 += (O - X) * (O - X);
@@ -36,21 +37,21 @@ static void detect_clpf(const uint8_t *rec, const uint8_t *org, int x0, int y0,
   }
 }
 
-static void detect_multi_clpf(const uint8_t *rec, const uint8_t *org, int x0,
-                              int y0, int width, int height, int so, int stride,
-                              int *sum) {
+void aom_clpf_detect_multi_c(const uint8_t *rec, const uint8_t *org,
+                             int rstride, int ostride, int x0, int y0,
+                             int width, int height, int *sum) {
   int x, y;
 
   for (y = y0; y < y0 + 8; y++) {
     for (x = x0; x < x0 + 8; x++) {
-      int O = org[y * so + x];
-      int X = rec[y * stride + x];
-      int A = rec[AOMMAX(0, y - 1) * stride + x];
-      int B = rec[y * stride + AOMMAX(0, x - 2)];
-      int C = rec[y * stride + AOMMAX(0, x - 1)];
-      int D = rec[y * stride + AOMMIN(width - 1, x + 1)];
-      int E = rec[y * stride + AOMMIN(width - 1, x + 2)];
-      int F = rec[AOMMIN(height - 1, y + 1) * stride + x];
+      int O = org[y * ostride + x];
+      int X = rec[y * rstride + x];
+      int A = rec[AOMMAX(0, y - 1) * rstride + x];
+      int B = rec[y * rstride + AOMMAX(0, x - 2)];
+      int C = rec[y * rstride + AOMMAX(0, x - 1)];
+      int D = rec[y * rstride + AOMMIN(width - 1, x + 1)];
+      int E = rec[y * rstride + AOMMIN(width - 1, x + 2)];
+      int F = rec[AOMMIN(height - 1, y + 1) * rstride + x];
       int delta1 = av1_clpf_sample(X, A, B, C, D, E, F, 1);
       int delta2 = av1_clpf_sample(X, A, B, C, D, E, F, 2);
       int delta3 = av1_clpf_sample(X, A, B, C, D, E, F, 4);
@@ -77,9 +78,9 @@ int av1_clpf_decision(int k, int l, const YV12_BUFFER_CONFIG *rec,
       const int bs = MAX_MIB_SIZE;
       if (!cm->mi_grid_visible[ypos / bs * cm->mi_stride + xpos / bs]
                ->mbmi.skip)
-        detect_clpf(rec->y_buffer, org->y_buffer, xpos, ypos, rec->y_crop_width,
-                    rec->y_crop_height, org->y_stride, rec->y_stride, &sum0,
-                    &sum1, strength);
+        aom_clpf_detect(rec->y_buffer, org->y_buffer, rec->y_stride,
+                        org->y_stride, xpos, ypos, rec->y_crop_width,
+                        rec->y_crop_height, &sum0, &sum1, strength);
     }
   }
   *res = sum1 < sum0;
@@ -99,7 +100,7 @@ static int clpf_rdo(int y, int x, const YV12_BUFFER_CONFIG *rec,
                     const YV12_BUFFER_CONFIG *org, const AV1_COMMON *cm,
                     unsigned int block_size, unsigned int fb_size_log2, int w,
                     int h, int64_t res[4][4]) {
-  int i, m, n, filtered = 0;
+  int c, m, n, filtered = 0;
   int sum[4];
   int bslog = get_msb(block_size);
   sum[0] = sum[1] = sum[2] = sum[3] = 0;
@@ -144,19 +145,19 @@ static int clpf_rdo(int y, int x, const YV12_BUFFER_CONFIG *rec,
       if (!cm->mi_grid_visible[ypos / MAX_MIB_SIZE * cm->mi_stride +
                                xpos / MAX_MIB_SIZE]
                ->mbmi.skip) {
-        detect_multi_clpf(rec->y_buffer, org->y_buffer, xpos, ypos,
-                          rec->y_crop_width, rec->y_crop_height, org->y_stride,
-                          rec->y_stride, sum);
+        aom_clpf_detect_multi(rec->y_buffer, org->y_buffer, rec->y_stride,
+                              org->y_stride, xpos, ypos, rec->y_crop_width,
+                              rec->y_crop_height, sum);
         filtered = 1;
       }
     }
   }
 
-  for (i = 0; i < 4; i++) {
-    res[i][0] += sum[0];
-    res[i][1] += sum[1];
-    res[i][2] += sum[2];
-    res[i][3] += sum[3];
+  for (c = 0; c < 4; c++) {
+    res[c][0] += sum[0];
+    res[c][1] += sum[1];
+    res[c][2] += sum[2];
+    res[c][3] += sum[3];
   }
   return filtered;
 }
@@ -164,7 +165,7 @@ static int clpf_rdo(int y, int x, const YV12_BUFFER_CONFIG *rec,
 void av1_clpf_test_frame(const YV12_BUFFER_CONFIG *rec,
                          const YV12_BUFFER_CONFIG *org, const AV1_COMMON *cm,
                          int *best_strength, int *best_bs) {
-  int i, j, k, l;
+  int c, j, k, l;
   int64_t best, sums[4][4];
   int width = rec->y_crop_width, height = rec->y_crop_height;
   const int bs = MAX_MIB_SIZE;
@@ -190,31 +191,29 @@ void av1_clpf_test_frame(const YV12_BUFFER_CONFIG *rec,
 
   for (j = 0; j < 4; j++) {
     static const double lambda_square[] = {
-      // exp((i - 15.4244) / 8.4010)
-      0.159451, 0.179607, 0.202310, 0.227884, 0.256690, 0.289138, 0.325687,
-      0.366856, 0.413230, 0.465465, 0.524303, 0.590579, 0.665233, 0.749323,
-      0.844044, 0.950737, 1.070917, 1.206289, 1.358774, 1.530533, 1.724004,
-      1.941931, 2.187406, 2.463911, 2.775368, 3.126195, 3.521370, 3.966498,
-      4.467893, 5.032669, 5.668837, 6.385421, 7.192586, 8.101784, 9.125911,
-      10.27949, 11.57890, 13.04256, 14.69124, 16.54832, 18.64016, 20.99641,
-      23.65052, 26.64013, 30.00764, 33.80084, 38.07352, 42.88630, 48.30746,
-      54.41389, 61.29221, 69.04002, 77.76720, 87.59756, 98.67056, 111.1432,
-      125.1926, 141.0179, 158.8436, 178.9227, 201.5399, 227.0160, 255.7126,
-      288.0366
+      // exp(x / 8.5)
+      1.0000, 1.1248, 1.2653, 1.4232, 1.6009, 1.8008, 2.0256, 2.2785,
+      2.5630, 2.8830, 3.2429, 3.6478, 4.1032, 4.6155, 5.1917, 5.8399,
+      6.5689, 7.3891, 8.3116, 9.3492, 10.516, 11.829, 13.306, 14.967,
+      16.836, 18.938, 21.302, 23.962, 26.953, 30.318, 34.103, 38.361,
+      43.151, 48.538, 54.598, 61.414, 69.082, 77.706, 87.408, 98.320,
+      110.59, 124.40, 139.93, 157.40, 177.05, 199.16, 224.02, 251.99,
+      283.45, 318.84, 358.65, 403.42, 453.79, 510.45, 574.17, 645.86,
+      726.49, 817.19, 919.22, 1033.9, 1163.0, 1308.2, 1471.6, 1655.3
     };
 
     // Estimate the bit costs and adjust the square errors
     double lambda =
         lambda_square[av1_get_qindex(&cm->seg, 0, cm->base_qindex) >> 2];
-    int i, cost = (int)((1.2 * lambda * (sums[j][0] + 2 + 2 * (j > 0)) + 0.5));
+    int i, cost = (int)((lambda * (sums[j][0] + 2 + 2 * (j > 0)) + 0.5));
     for (i = 0; i < 4; i++)
       sums[j][i] = ((sums[j][i] + (i && j) * cost) << 4) + j * 4 + i;
   }
 
   best = (int64_t)1 << 62;
-  for (i = 0; i < 4; i++)
+  for (c = 0; c < 4; c++)
     for (j = 0; j < 4; j++)
-      if ((!i || j) && sums[i][j] < best) best = sums[i][j];
+      if ((!c || j) && sums[c][j] < best) best = sums[c][j];
   best &= 15;
   *best_bs = (best > 3) * (5 + (best < 12) + (best < 8));
   *best_strength = best ? 1 << ((best - 1) & 3) : 0;

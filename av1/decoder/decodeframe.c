@@ -17,6 +17,7 @@
 #include "./aom_scale_rtcd.h"
 #include "./av1_rtcd.h"
 
+#include "aom/aom_codec.h"
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/bitreader.h"
 #include "aom_dsp/bitreader_buffer.h"
@@ -126,15 +127,15 @@ static void read_tx_mode_probs(struct tx_probs *tx_probs, aom_reader *r) {
   int i, j;
 
   for (i = 0; i < TX_SIZE_CONTEXTS; ++i)
-    for (j = 0; j < TX_SIZES - 3; ++j)
+    for (j = TX_4X4; j < TX_SIZES - 3; ++j)
       av1_diff_update_prob(r, &tx_probs->p8x8[i][j]);
 
   for (i = 0; i < TX_SIZE_CONTEXTS; ++i)
-    for (j = 0; j < TX_SIZES - 2; ++j)
+    for (j = TX_4X4; j < TX_SIZES - 2; ++j)
       av1_diff_update_prob(r, &tx_probs->p16x16[i][j]);
 
   for (i = 0; i < TX_SIZE_CONTEXTS; ++i)
-    for (j = 0; j < TX_SIZES - 1; ++j)
+    for (j = TX_4X4; j < TX_SIZES - 1; ++j)
       av1_diff_update_prob(r, &tx_probs->p32x32[i][j]);
 }
 
@@ -314,11 +315,12 @@ static void inverse_transform_block_inter(MACROBLOCKD *xd, int plane,
       dqcoeff[0] = 0;
     } else {
       if (tx_type == DCT_DCT && tx_size <= TX_16X16 && eob <= 10)
-        memset(dqcoeff, 0, 4 * (4 << tx_size) * sizeof(dqcoeff[0]));
+        memset(dqcoeff, 0, 4 * tx_size_1d[tx_size] * sizeof(dqcoeff[0]));
       else if (tx_size == TX_32X32 && eob <= 34)
         memset(dqcoeff, 0, 256 * sizeof(dqcoeff[0]));
       else
-        memset(dqcoeff, 0, (16 << (tx_size << 1)) * sizeof(dqcoeff[0]));
+        memset(dqcoeff, 0,
+               (1 << (tx_size_1d_log2[tx_size] * 2)) * sizeof(dqcoeff[0]));
     }
   }
 }
@@ -379,11 +381,12 @@ static void inverse_transform_block_intra(MACROBLOCKD *xd, int plane,
       dqcoeff[0] = 0;
     } else {
       if (tx_type == DCT_DCT && tx_size <= TX_16X16 && eob <= 10)
-        memset(dqcoeff, 0, 4 * (4 << tx_size) * sizeof(dqcoeff[0]));
+        memset(dqcoeff, 0, 4 * tx_size_1d[tx_size] * sizeof(dqcoeff[0]));
       else if (tx_size == TX_32X32 && eob <= 34)
         memset(dqcoeff, 0, 256 * sizeof(dqcoeff[0]));
       else
-        memset(dqcoeff, 0, (16 << (tx_size << 1)) * sizeof(dqcoeff[0]));
+        memset(dqcoeff, 0,
+               (1 << (tx_size_1d_log2[tx_size] * 2)) * sizeof(dqcoeff[0]));
     }
 #endif
   }
@@ -632,13 +635,6 @@ static int reconstruct_inter_block(MACROBLOCKD *const xd, aom_reader *r,
   return eob;
 }
 
-static INLINE TX_SIZE dec_get_uv_tx_size(const MB_MODE_INFO *mbmi, int n4_wl,
-                                         int n4_hl) {
-  // get minimum log2 num4x4s dimension
-  const int x = AOMMIN(n4_wl, n4_hl);
-  return AOMMIN(mbmi->tx_size, x);
-}
-
 static INLINE void dec_reset_skip_context(MACROBLOCKD *xd) {
   int i;
   for (i = 0; i < MAX_MB_PLANE; i++) {
@@ -712,12 +708,10 @@ static void decode_block(AV1Decoder *const pbi, MACROBLOCKD *const xd,
 #endif  // CONFIG_PALETTE
     for (plane = 0; plane < MAX_MB_PLANE; ++plane) {
       const struct macroblockd_plane *const pd = &xd->plane[plane];
-      const TX_SIZE tx_size =
-          plane ? dec_get_uv_tx_size(mbmi, pd->n4_wl, pd->n4_hl)
-                : mbmi->tx_size;
+      const TX_SIZE tx_size = plane ? get_uv_tx_size(mbmi, pd) : mbmi->tx_size;
       const int num_4x4_w = pd->n4_w;
       const int num_4x4_h = pd->n4_h;
-      const int step = (1 << tx_size);
+      const int step = tx_size_1d_in_unit[tx_size];
       int row, col;
       const int max_blocks_wide =
           num_4x4_w + (xd->mb_to_right_edge >= 0
@@ -748,11 +742,10 @@ static void decode_block(AV1Decoder *const pbi, MACROBLOCKD *const xd,
       for (plane = 0; plane < MAX_MB_PLANE; ++plane) {
         const struct macroblockd_plane *const pd = &xd->plane[plane];
         const TX_SIZE tx_size =
-            plane ? dec_get_uv_tx_size(mbmi, pd->n4_wl, pd->n4_hl)
-                  : mbmi->tx_size;
+            plane ? get_uv_tx_size(mbmi, pd) : mbmi->tx_size;
         const int num_4x4_w = pd->n4_w;
         const int num_4x4_h = pd->n4_h;
-        const int step = (1 << tx_size);
+        const int step = tx_size_1d_in_unit[tx_size];
         int row, col;
         const int max_blocks_wide =
             num_4x4_w + (xd->mb_to_right_edge >= 0
@@ -942,9 +935,9 @@ static void read_coef_probs_common(av1_coeff_probs_model *coef_probs,
 static void read_coef_probs(FRAME_CONTEXT *fc, TX_MODE tx_mode, aom_reader *r) {
   const TX_SIZE max_tx_size = tx_mode_to_biggest_tx_size[tx_mode];
   TX_SIZE tx_size;
-  for (tx_size = TX_4X4; tx_size <= max_tx_size; ++tx_size)
+  for (tx_size = 0; tx_size <= max_tx_size; ++tx_size)
     read_coef_probs_common(fc->coef_probs[tx_size], r);
-#if CONFIG_RANS
+#if CONFIG_RANS || CONFIG_DAALA_EC
   av1_coef_pareto_cdfs(fc);
 #endif  // CONFIG_RANS
 }
@@ -972,9 +965,13 @@ static void setup_segmentation(AV1_COMMON *const cm,
   }
   if (seg->update_map) {
 #if !CONFIG_MISC_FIXES
-    for (i = 0; i < SEG_TREE_PROBS; i++)
+    for (i = 0; i < SEG_TREE_PROBS; i++) {
       segp->tree_probs[i] =
           aom_rb_read_bit(rb) ? aom_rb_read_literal(rb, 8) : MAX_PROB;
+    }
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_segment_tree, segp->tree_probs, segp->tree_cdf);
+#endif
 #endif
     if (frame_is_intra_only(cm) || cm->error_resilient_mode) {
       seg->temporal_update = 0;
@@ -1058,10 +1055,12 @@ static void setup_clpf(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
   }
 }
 
-static int clpf_bit(int k, int l, const YV12_BUFFER_CONFIG *rec,
-                    const YV12_BUFFER_CONFIG *org, const AV1_COMMON *cm,
-                    int block_size, int w, int h, unsigned int strength,
-                    unsigned int fb_size_log2, uint8_t *bit) {
+static int clpf_bit(UNUSED int k, UNUSED int l,
+                    UNUSED const YV12_BUFFER_CONFIG *rec,
+                    UNUSED const YV12_BUFFER_CONFIG *org,
+                    UNUSED const AV1_COMMON *cm, UNUSED int block_size,
+                    UNUSED int w, UNUSED int h, UNUSED unsigned int strength,
+                    UNUSED unsigned int fb_size_log2, uint8_t *bit) {
   return *bit;
 }
 #endif
@@ -2279,6 +2278,10 @@ static int read_compressed_header(AV1Decoder *pbi, const uint8_t *data,
     }
     for (k = 0; k < MAX_SEGMENTS - 1; k++)
       av1_diff_update_prob(&r, &cm->fc->seg.tree_probs[k]);
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_segment_tree, cm->fc->seg.tree_probs,
+                    cm->fc->seg.tree_cdf);
+#endif
   }
 
   for (j = 0; j < INTRA_MODES; j++)

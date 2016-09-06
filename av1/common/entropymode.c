@@ -789,9 +789,14 @@ static const aom_prob default_switchable_interp_prob
 
 #if CONFIG_MISC_FIXES
 // FIXME(someone) need real defaults here
-static const struct segmentation_probs default_seg_probs = {
-  { 128, 128, 128, 128, 128, 128, 128 }, { 128, 128, 128 },
+static const aom_prob default_segment_tree_probs[SEG_TREE_PROBS] = {
+  128, 128, 128, 128, 128, 128, 128
 };
+// clang-format off
+static const aom_prob default_segment_pred_probs[PREDICTION_PROBS] = {
+  128, 128, 128
+};
+// clang-format on
 #endif
 
 const aom_tree_index av1_ext_tx_tree[TREE_SIZE(TX_TYPES)] = {
@@ -839,8 +844,8 @@ static void init_mode_probs(FRAME_CONTEXT *fc) {
   av1_copy(fc->motion_mode_prob, default_motion_mode_prob);
 #endif  // CONFIG_MOTION_VAR
 #if CONFIG_MISC_FIXES
-  av1_copy(fc->seg.tree_probs, default_seg_probs.tree_probs);
-  av1_copy(fc->seg.pred_probs, default_seg_probs.pred_probs);
+  av1_copy(fc->seg.tree_probs, default_segment_tree_probs);
+  av1_copy(fc->seg.pred_probs, default_segment_pred_probs);
 #endif
   av1_copy(fc->intra_ext_tx_prob, default_intra_ext_tx_prob);
   av1_copy(fc->inter_ext_tx_prob, default_inter_ext_tx_prob);
@@ -853,6 +858,9 @@ static void init_mode_probs(FRAME_CONTEXT *fc) {
                      fc->inter_ext_tx_cdf, EXT_TX_SIZES);
   av1_tree_to_cdf_1D(av1_partition_tree, fc->partition_prob, fc->partition_cdf,
                      PARTITION_CONTEXTS);
+#if CONFIG_MISC_FIXES
+  av1_tree_to_cdf(av1_segment_tree, fc->seg.tree_probs, fc->seg.tree_cdf);
+#endif
 #endif
 }
 
@@ -976,19 +984,19 @@ void av1_adapt_intra_frame_probs(AV1_COMMON *cm) {
 
     for (i = 0; i < TX_SIZE_CONTEXTS; ++i) {
       av1_tx_counts_to_branch_counts_8x8(counts->tx.p8x8[i], branch_ct_8x8p);
-      for (j = 0; j < TX_SIZES - 3; ++j)
+      for (j = TX_4X4; j < TX_SIZES - 3; ++j)
         fc->tx_probs.p8x8[i][j] =
             mode_mv_merge_probs(pre_fc->tx_probs.p8x8[i][j], branch_ct_8x8p[j]);
 
       av1_tx_counts_to_branch_counts_16x16(counts->tx.p16x16[i],
                                            branch_ct_16x16p);
-      for (j = 0; j < TX_SIZES - 2; ++j)
+      for (j = TX_4X4; j < TX_SIZES - 2; ++j)
         fc->tx_probs.p16x16[i][j] = mode_mv_merge_probs(
             pre_fc->tx_probs.p16x16[i][j], branch_ct_16x16p[j]);
 
       av1_tx_counts_to_branch_counts_32x32(counts->tx.p32x32[i],
                                            branch_ct_32x32p);
-      for (j = 0; j < TX_SIZES - 1; ++j)
+      for (j = TX_4X4; j < TX_SIZES - 1; ++j)
         fc->tx_probs.p32x32[i][j] = mode_mv_merge_probs(
             pre_fc->tx_probs.p32x32[i][j], branch_ct_32x32p[j]);
     }

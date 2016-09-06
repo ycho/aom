@@ -108,7 +108,7 @@ static int optimize_b(MACROBLOCK *mb, int plane, int block, TX_SIZE tx_size,
   tran_low_t *const dqcoeff = BLOCK_OFFSET(pd->dqcoeff, block);
   const int eob = p->eobs[block];
   const PLANE_TYPE type = pd->plane_type;
-  const int default_eob = 16 << (tx_size << 1);
+  const int default_eob = 1 << (tx_size_1d_log2[tx_size] * 2);
   const int mul = 1 + (tx_size == TX_32X32);
 #if CONFIG_AOM_QM
   int seg_id = xd->mi[0]->mbmi.segment_id;
@@ -310,8 +310,8 @@ static int optimize_b(MACROBLOCK *mb, int plane, int block, TX_SIZE tx_size,
   UPDATE_RD_COST();
   best = rd_cost1 < rd_cost0;
   final_eob = -1;
-  memset(qcoeff, 0, sizeof(*qcoeff) * (16 << (tx_size * 2)));
-  memset(dqcoeff, 0, sizeof(*dqcoeff) * (16 << (tx_size * 2)));
+  memset(qcoeff, 0, sizeof(*qcoeff) * default_eob);
+  memset(dqcoeff, 0, sizeof(*dqcoeff) * default_eob);
   for (i = next; i < eob; i = next) {
     const int x = tokens[i][best].qc;
     const int rc = scan[i];
@@ -914,7 +914,8 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
     }
   } else {
     if (max_txsize_lookup[plane_bsize] == tx_size) {
-      int txfm_blk_index = (plane << 2) + (block >> (tx_size << 1));
+      int txfm_blk_index =
+          (plane << 2) + (block >> (tx_size_1d_in_unit_log2[tx_size] << 1));
       if (x->skip_txfm[txfm_blk_index] == SKIP_TXFM_NONE) {
         // full forward transform and quantization
         av1_xform_quant(x, plane, block, blk_row, blk_col, plane_bsize,
@@ -1117,10 +1118,9 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
 
 #if !CONFIG_PVQ
   int16_t *src_diff;
-  int tx1d_size = get_tx1d_size(tx_size);
+  int tx1d_size = tx_size_1d[tx_size];
 
   src_diff = &p->src_diff[4 * (blk_row * diff_stride + blk_col)];
-
 #else
   tran_low_t *ref_coeff = BLOCK_OFFSET(pd->pvq_ref_coeff, block);
   int16_t *src_int16;
