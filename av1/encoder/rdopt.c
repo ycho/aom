@@ -515,7 +515,7 @@ static void dist_block(MACROBLOCK *x, int plane, int block, TX_SIZE tx_size,
         av1_highbd_block_error(coeff, dqcoeff, ss_txfrm_size, &this_sse, bd) >>
         shift;
 #elif CONFIG_PVQ
-  *out_dist = av1_block_error2_c(coeff, dqcoeff, ref_coeff, 16 << ss_txfrm_size,
+  *out_dist = av1_block_error2_c(coeff, dqcoeff, ref_coeff, ss_txfrm_size,
                                  &this_sse) >> shift;
 #else
   *out_dist =
