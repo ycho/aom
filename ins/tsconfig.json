@@ -1,0 +1,12 @@
+{
+    "compileOnSave": true,
+    "compilerOptions": {
+        "target": "es5",
+        "sourceMap": true
+    },
+    "files": [
+        "ext.d.ts",
+        "metrics.ts",
+        "app.ts"
+    ]
+}
