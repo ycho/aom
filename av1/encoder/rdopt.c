@@ -3157,6 +3157,9 @@ static int64_t rd_pick_best_sub8x8_mode(
             if (bsi->rdstat[index][mode_idx].brdcost < new_best_rd) {
               mode_selected = this_mode;
               new_best_rd = bsi->rdstat[index][mode_idx].brdcost;
+#if CONFIG_PVQ
+              od_encode_checkpoint(&x->daala_enc, &post_buf);
+#endif
             }
             continue;
           }
