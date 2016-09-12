@@ -335,9 +335,10 @@ int64_t av1_block_error2_c(const tran_low_t *coeff, const tran_low_t *dqcoeff,
   int64_t error = 0;
   int64_t pred_error = 0;
 
-  // Use the existing sse codes for calculating distortion of (orig - pred)
+  // Use the existing sse codes for calculating distortion of decoded signal:
+  // i.e. (orig - decoded)^2
   error = av1_block_error_fp(coeff, dqcoeff, block_size);
-
+  // Prediction error : (orig - predicted)^2
   for (i = 0; i < block_size; i++) {
     const int diff = coeff[i] - ref[i];
     pred_error += diff * diff;
@@ -2491,7 +2492,6 @@ static int64_t encode_inter_mb_segment(const AV1_COMP *const cpi, MACROBLOCK *x,
                  coeff, 8);
       av1_regular_quantize_b_4x4(x, 0, k, scan_order->scan, scan_order->iscan);
 #else
-      // TODO: Check whether 'k' is correct index
       dqcoeff = BLOCK_OFFSET(pd->dqcoeff, k);
       ref_coeff = BLOCK_OFFSET(pd->pvq_ref_coeff, k);
 

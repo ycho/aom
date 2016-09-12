@@ -1386,7 +1386,7 @@ int pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
 
   *eob = 0;
 
-  tell = od_ec_enc_tell(&daala_enc->ec);
+  tell = od_ec_enc_tell_frac(&daala_enc->ec);
 
   // Change coefficient ordering for pvq encoding.
   od_raster_to_coding_order(coeff_pvq, tx_blk_size, tx_type, coeff,
@@ -1453,7 +1453,7 @@ int pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
 
   *eob = tx_blk_size * tx_blk_size;
 
-  *rate = (od_ec_enc_tell(&daala_enc->ec) - tell) << AV1_PROB_COST_SHIFT;
+  *rate = (od_ec_enc_tell_frac(&daala_enc->ec) - tell) << (AV1_PROB_COST_SHIFT - OD_BITRES);
   assert(*rate >= 0);
 
   return skip;
