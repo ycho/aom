@@ -331,20 +331,15 @@ static void model_rd_for_sb(const AV1_COMP *const cpi, BLOCK_SIZE bsize,
 int64_t av1_block_error2_c(const tran_low_t *coeff, const tran_low_t *dqcoeff,
                            const tran_low_t *ref, intptr_t block_size,
                            int64_t *ssz) {
-  int i;
-  int64_t error = 0;
+    int64_t error = 0;
   int64_t pred_error = 0;
 
   // Use the existing sse codes for calculating distortion of decoded signal:
   // i.e. (orig - decoded)^2
   error = av1_block_error_fp(coeff, dqcoeff, block_size);
-  // Prediction error : (orig - predicted)^2
-  for (i = 0; i < block_size; i++) {
-    const int diff = coeff[i] - ref[i];
-    pred_error += diff * diff;
-  }
+  // prediction residue^2 = (orig - ref)^2
+  *ssz = av1_block_error_fp(coeff, ref, block_size);
 
-  *ssz = pred_error;
   return error;
 }
 #endif

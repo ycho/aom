@@ -925,10 +925,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
   }
   if (theta[0] == skip_theta_value && qg[0] == 0 && skip_rest) nb_bands = 0;
 
-  /* NOTE: There was no other better place to put this function.
-   * TODO: Better if we can call this function only when mode decision
-   *       (i.e. RDO) is over.
-   */
+  /* NOTE: There was no other better place to put this function. */
   if (pvq_info)
     store_pvq_enc_info(pvq_info, qg, theta, max_theta, k,
       y, nb_bands, off, size,
