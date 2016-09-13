@@ -38,21 +38,30 @@ LIBYUV_SRCS +=  third_party/libyuv/include/libyuv/basic_types.h  \
                 third_party/libyuv/source/scale_neon64.cc \
                 third_party/libyuv/source/scale_win.cc \
 
-LIBWEBM_COMMON_SRCS += third_party/libwebm/webmids.hpp
+LIBWEBM_COMMON_SRCS += third_party/libwebm/common/hdr_util.cc \
+                       third_party/libwebm/common/hdr_util.h \
+                       third_party/libwebm/common/webmids.h
 
-LIBWEBM_MUXER_SRCS += third_party/libwebm/mkvmuxer.cpp \
-                      third_party/libwebm/mkvmuxerutil.cpp \
-                      third_party/libwebm/mkvwriter.cpp \
-                      third_party/libwebm/mkvmuxer.hpp \
-                      third_party/libwebm/mkvmuxertypes.hpp \
-                      third_party/libwebm/mkvmuxerutil.hpp \
-                      third_party/libwebm/mkvparser.hpp \
-                      third_party/libwebm/mkvwriter.hpp
+LIBWEBM_MUXER_SRCS += third_party/libwebm/mkvmuxer/mkvmuxer.cc \
+                      third_party/libwebm/mkvmuxer/mkvmuxerutil.cc \
+                      third_party/libwebm/mkvmuxer/mkvwriter.cc \
+                      third_party/libwebm/mkvmuxer/mkvmuxer.h \
+                      third_party/libwebm/mkvmuxer/mkvmuxertypes.h \
+                      third_party/libwebm/mkvmuxer/mkvmuxerutil.h \
+                      third_party/libwebm/mkvparser/mkvparser.h \
+                      third_party/libwebm/mkvmuxer/mkvwriter.h
 
-LIBWEBM_PARSER_SRCS = third_party/libwebm/mkvparser.cpp \
-                      third_party/libwebm/mkvreader.cpp \
-                      third_party/libwebm/mkvparser.hpp \
-                      third_party/libwebm/mkvreader.hpp
+LIBWEBM_PARSER_SRCS = third_party/libwebm/mkvparser/mkvparser.cc \
+                      third_party/libwebm/mkvparser/mkvreader.cc \
+                      third_party/libwebm/mkvparser/mkvparser.h \
+                      third_party/libwebm/mkvparser/mkvreader.h
+
+# Add compile flags and include path for libwebm sources.
+ifeq ($(CONFIG_WEBM_IO),yes)
+  CXXFLAGS     += -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS
+  INC_PATH-yes += $(SRC_PATH_BARE)/third_party/libwebm
+endif
+
 
 # List of examples to build. UTILS are tools meant for distribution
 # while EXAMPLES demonstrate specific portions of the API.
@@ -72,6 +81,7 @@ ifeq ($(CONFIG_LIBYUV),yes)
 endif
 ifeq ($(CONFIG_WEBM_IO),yes)
   aomdec.SRCS                 += $(LIBWEBM_COMMON_SRCS)
+  aomdec.SRCS                 += $(LIBWEBM_MUXER_SRCS)
   aomdec.SRCS                 += $(LIBWEBM_PARSER_SRCS)
   aomdec.SRCS                 += webmdec.cc webmdec.h
 endif
@@ -95,6 +105,7 @@ endif
 ifeq ($(CONFIG_WEBM_IO),yes)
   aomenc.SRCS                 += $(LIBWEBM_COMMON_SRCS)
   aomenc.SRCS                 += $(LIBWEBM_MUXER_SRCS)
+  aomenc.SRCS                 += $(LIBWEBM_PARSER_SRCS)
   aomenc.SRCS                 += webmenc.cc webmenc.h
 endif
 aomenc.GUID                  = 548DEC74-7A15-4B2B-AFC3-AA102E7C25C1
@@ -129,6 +140,14 @@ simple_encoder.SRCS             += video_writer.h video_writer.c
 simple_encoder.SRCS             += aom_ports/msvc.h
 simple_encoder.GUID              = 4607D299-8A71-4D2C-9B1D-071899B6FBFD
 simple_encoder.DESCRIPTION       = Simplified encoder loop
+EXAMPLES-$(CONFIG_AV1_ENCODER)  += lossless_encoder.c
+lossless_encoder.SRCS           += ivfenc.h ivfenc.c
+lossless_encoder.SRCS           += tools_common.h tools_common.c
+lossless_encoder.SRCS           += video_common.h
+lossless_encoder.SRCS           += video_writer.h video_writer.c
+lossless_encoder.SRCS           += aom_ports/msvc.h
+lossless_encoder.GUID            = B63C7C88-5348-46DC-A5A6-CC151EF93366
+lossless_encoder.DESCRIPTION     = Simplified lossless encoder
 EXAMPLES-$(CONFIG_ENCODERS)     += twopass_encoder.c
 twopass_encoder.SRCS            += ivfenc.h ivfenc.c
 twopass_encoder.SRCS            += tools_common.h tools_common.c
