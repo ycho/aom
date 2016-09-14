@@ -46,8 +46,12 @@ static void encode_mv_component(aom_writer *w, int comp,
   aom_write(w, sign, mvcomp->sign);
 
   // Class
+#if CONFIG_DAALA_EC
+  aom_write_symbol(w, mv_class, mvcomp->class_cdf, MV_CLASSES);
+#else
   av1_write_token(w, av1_mv_class_tree, mvcomp->classes,
                   &mv_class_encodings[mv_class]);
+#endif
 
   // Integer bits
   if (mv_class == MV_CLASS_0) {
@@ -59,9 +63,15 @@ static void encode_mv_component(aom_writer *w, int comp,
   }
 
   // Fractional bits
+#if CONFIG_DAALA_EC
+  aom_write_symbol(
+      w, fr, mv_class == MV_CLASS_0 ? mvcomp->class0_fp_cdf[d] : mvcomp->fp_cdf,
+      MV_FP_SIZE);
+#else
   av1_write_token(w, av1_mv_fp_tree,
                   mv_class == MV_CLASS_0 ? mvcomp->class0_fp[d] : mvcomp->fp,
                   &mv_fp_encodings[fr]);
+#endif
 
   // High precision bit
   if (usehp)
@@ -214,6 +224,9 @@ void av1_write_nmv_probs(AV1_COMMON *cm, int usehp, aom_writer *w,
     update_mv(w, comp_counts->sign, &comp->sign, MV_UPDATE_PROB);
     write_mv_update(av1_mv_class_tree, comp->classes, comp_counts->classes,
                     MV_CLASSES, w);
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_mv_class_tree, comp->classes, comp->class_cdf);
+#endif
     write_mv_update(av1_mv_class0_tree, comp->class0, comp_counts->class0,
                     CLASS0_SIZE, w);
     for (j = 0; j < MV_OFFSET_BITS; ++j)
@@ -221,12 +234,19 @@ void av1_write_nmv_probs(AV1_COMMON *cm, int usehp, aom_writer *w,
   }
 
   for (i = 0; i < 2; ++i) {
-    for (j = 0; j < CLASS0_SIZE; ++j)
+    for (j = 0; j < CLASS0_SIZE; ++j) {
       write_mv_update(av1_mv_fp_tree, mvc->comps[i].class0_fp[j],
                       counts->comps[i].class0_fp[j], MV_FP_SIZE, w);
-
+#if CONFIG_DAALA_EC
+      av1_tree_to_cdf(av1_mv_fp_tree, mvc->comps[i].class0_fp[j],
+                      mvc->comps[i].class0_fp_cdf[j]);
+#endif
+    }
     write_mv_update(av1_mv_fp_tree, mvc->comps[i].fp, counts->comps[i].fp,
                     MV_FP_SIZE, w);
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_mv_fp_tree, mvc->comps[i].fp, mvc->comps[i].fp_cdf);
+#endif
   }
 
   if (usehp) {
@@ -245,7 +265,11 @@ void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
   const MV_JOINT_TYPE j = av1_get_mv_joint(&diff);
   usehp = usehp && av1_use_mv_hp(ref);
 
+#if CONFIG_DAALA_EC
+  aom_write_symbol(w, j, mvctx->joint_cdf, MV_JOINTS);
+#else
   av1_write_token(w, av1_mv_joint_tree, mvctx->joints, &mv_joint_encodings[j]);
+#endif
   if (mv_joint_vertical(j))
     encode_mv_component(w, diff.row, &mvctx->comps[0], usehp);
 

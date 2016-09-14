@@ -153,14 +153,18 @@ static uint8_t scan_row_mbmi(const AV1_COMMON *cm, const MACROBLOCKD *xd,
       const MODE_INFO *const candidate_mi =
           xd->mi[mi_pos.row * xd->mi_stride + mi_pos.col];
       const MB_MODE_INFO *const candidate_mbmi = &candidate_mi->mbmi;
-      const int len =
+      int len =
           AOMMIN(xd->n8_w, num_8x8_blocks_wide_lookup[candidate_mbmi->sb_type]);
+      if (xd->n8_w >= 8) len = AOMMAX(2, len);
       newmv_count += add_ref_mv_candidate(
           xd, candidate_mi, candidate_mbmi, rf, refmv_count, ref_mv_stack,
           cm->allow_high_precision_mv, len, block, mi_pos.col);
       i += len;
     } else {
-      ++i;
+      if (xd->n8_w >= 8)
+        i += 2;
+      else
+        ++i;
     }
   }
   return newmv_count;
@@ -183,14 +187,18 @@ static uint8_t scan_col_mbmi(const AV1_COMMON *cm, const MACROBLOCKD *xd,
       const MODE_INFO *const candidate_mi =
           xd->mi[mi_pos.row * xd->mi_stride + mi_pos.col];
       const MB_MODE_INFO *const candidate_mbmi = &candidate_mi->mbmi;
-      const int len =
+      int len =
           AOMMIN(xd->n8_h, num_8x8_blocks_high_lookup[candidate_mbmi->sb_type]);
+      if (xd->n8_h >= 8) len = AOMMAX(2, len);
       newmv_count += add_ref_mv_candidate(
           xd, candidate_mi, candidate_mbmi, rf, refmv_count, ref_mv_stack,
           cm->allow_high_precision_mv, len, block, mi_pos.col);
       i += len;
     } else {
-      ++i;
+      if (xd->n8_h >= 8)
+        i += 2;
+      else
+        ++i;
     }
   }
   return newmv_count;
@@ -361,8 +369,8 @@ static void setup_ref_mv_list(const AV1_COMMON *cm, const MACROBLOCKD *xd,
     int blk_row, blk_col;
     int coll_blk_count = 0;
 
-    for (blk_row = 0; blk_row < xd->n8_h; ++blk_row) {
-      for (blk_col = 0; blk_col < xd->n8_w; ++blk_col) {
+    for (blk_row = 0; blk_row < xd->n8_h; blk_row += 2) {
+      for (blk_col = 0; blk_col < xd->n8_w; blk_col += 2) {
         coll_blk_count += add_col_ref_mv(
             cm, prev_frame_mvs_base, xd, mi_row, mi_col, ref_frame, blk_row,
             blk_col, refmv_count, ref_mv_stack, mode_context);

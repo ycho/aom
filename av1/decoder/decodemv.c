@@ -27,14 +27,25 @@
 
 #define ACCT_STR __func__
 
+#if CONFIG_DAALA_EC
+static PREDICTION_MODE read_intra_mode(aom_reader *r, const aom_cdf_prob *cdf) {
+  return (PREDICTION_MODE)
+      av1_intra_mode_inv[aom_read_symbol(r, cdf, INTRA_MODES, ACCT_STR)];
+}
+#else
 static PREDICTION_MODE read_intra_mode(aom_reader *r, const aom_prob *p) {
   return (PREDICTION_MODE)aom_read_tree(r, av1_intra_mode_tree, p, ACCT_STR);
 }
+#endif
 
 static PREDICTION_MODE read_intra_mode_y(AV1_COMMON *cm, MACROBLOCKD *xd,
                                          aom_reader *r, int size_group) {
   const PREDICTION_MODE y_mode =
+#if CONFIG_DAALA_EC
+      read_intra_mode(r, cm->fc->y_mode_cdf[size_group]);
+#else
       read_intra_mode(r, cm->fc->y_mode_prob[size_group]);
+#endif
   FRAME_COUNTS *counts = xd->counts;
   if (counts) ++counts->y_mode[size_group][y_mode];
   return y_mode;
@@ -44,7 +55,11 @@ static PREDICTION_MODE read_intra_mode_uv(AV1_COMMON *cm, MACROBLOCKD *xd,
                                           aom_reader *r,
                                           PREDICTION_MODE y_mode) {
   const PREDICTION_MODE uv_mode =
+#if CONFIG_DAALA_EC
+      read_intra_mode(r, cm->fc->uv_mode_cdf[y_mode]);
+#else
       read_intra_mode(r, cm->fc->uv_mode_prob[y_mode]);
+#endif
   FRAME_COUNTS *counts = xd->counts;
   if (counts) ++counts->uv_mode[y_mode][uv_mode];
   return uv_mode;
@@ -92,8 +107,13 @@ static PREDICTION_MODE read_inter_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
   // Invalid prediction mode.
   assert(0);
 #else
+#if CONFIG_DAALA_EC
+  const int mode = av1_inter_mode_inv[aom_read_symbol(
+      r, cm->fc->inter_mode_cdf[ctx], INTER_MODES, ACCT_STR)];
+#else
   const int mode = aom_read_tree(r, av1_inter_mode_tree,
                                  cm->fc->inter_mode_probs[ctx], ACCT_STR);
+#endif
   FRAME_COUNTS *counts = xd->counts;
   if (counts) ++counts->inter_mode[ctx][mode];
 
@@ -447,24 +467,48 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
     case BLOCK_4X4:
       for (i = 0; i < 4; ++i)
         mi->bmi[i].as_mode =
+#if CONFIG_DAALA_EC
+            read_intra_mode(r, get_y_mode_cdf(cm, mi, above_mi, left_mi, i));
+#else
             read_intra_mode(r, get_y_mode_probs(cm, mi, above_mi, left_mi, i));
+#endif
       mbmi->mode = mi->bmi[3].as_mode;
       break;
     case BLOCK_4X8:
       mi->bmi[0].as_mode = mi->bmi[2].as_mode =
+#if CONFIG_DAALA_EC
+          read_intra_mode(r, get_y_mode_cdf(cm, mi, above_mi, left_mi, 0));
+#else
           read_intra_mode(r, get_y_mode_probs(cm, mi, above_mi, left_mi, 0));
+#endif
       mi->bmi[1].as_mode = mi->bmi[3].as_mode = mbmi->mode =
+#if CONFIG_DAALA_EC
+          read_intra_mode(r, get_y_mode_cdf(cm, mi, above_mi, left_mi, 1));
+#else
           read_intra_mode(r, get_y_mode_probs(cm, mi, above_mi, left_mi, 1));
+#endif
       break;
     case BLOCK_8X4:
       mi->bmi[0].as_mode = mi->bmi[1].as_mode =
+#if CONFIG_DAALA_EC
+          read_intra_mode(r, get_y_mode_cdf(cm, mi, above_mi, left_mi, 0));
+#else
           read_intra_mode(r, get_y_mode_probs(cm, mi, above_mi, left_mi, 0));
+#endif
       mi->bmi[2].as_mode = mi->bmi[3].as_mode = mbmi->mode =
+#if CONFIG_DAALA_EC
+          read_intra_mode(r, get_y_mode_cdf(cm, mi, above_mi, left_mi, 2));
+#else
           read_intra_mode(r, get_y_mode_probs(cm, mi, above_mi, left_mi, 2));
+#endif
       break;
     default:
       mbmi->mode =
+#if CONFIG_DAALA_EC
+          read_intra_mode(r, get_y_mode_cdf(cm, mi, above_mi, left_mi, 0));
+#else
           read_intra_mode(r, get_y_mode_probs(cm, mi, above_mi, left_mi, 0));
+#endif
   }
 
   mbmi->uv_mode = read_intra_mode_uv(cm, xd, r, mbmi->mode);
@@ -483,9 +527,15 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
     FRAME_COUNTS *counts = xd->counts;
     TX_TYPE tx_type_nom = intra_mode_to_tx_type_context[mbmi->mode];
+#if CONFIG_DAALA_EC
+    mbmi->tx_type = av1_ext_tx_inv[aom_read_symbol(
+        r, cm->fc->intra_ext_tx_cdf[mbmi->tx_size][tx_type_nom], TX_TYPES,
+        ACCT_STR)];
+#else
     mbmi->tx_type = aom_read_tree(
         r, av1_ext_tx_tree,
         cm->fc->intra_ext_tx_prob[mbmi->tx_size][tx_type_nom], ACCT_STR);
+#endif
     if (counts)
       ++counts->intra_ext_tx[mbmi->tx_size][tx_type_nom][mbmi->tx_type];
   } else {
@@ -498,7 +548,11 @@ static int read_mv_component(aom_reader *r, const nmv_component *mvcomp,
   int mag, d, fr, hp;
   const int sign = aom_read(r, mvcomp->sign, ACCT_STR);
   const int mv_class =
+#if CONFIG_DAALA_EC
+      aom_read_symbol(r, mvcomp->class_cdf, MV_CLASSES, ACCT_STR);
+#else
       aom_read_tree(r, av1_mv_class_tree, mvcomp->classes, ACCT_STR);
+#endif
   const int class0 = mv_class == MV_CLASS_0;
 
   // Integer part
@@ -515,8 +569,13 @@ static int read_mv_component(aom_reader *r, const nmv_component *mvcomp,
   }
 
   // Fractional part
+#if CONFIG_DAALA_EC
+  fr = aom_read_symbol(r, class0 ? mvcomp->class0_fp_cdf[d] : mvcomp->fp_cdf,
+                       MV_FP_SIZE, ACCT_STR);
+#else
   fr = aom_read_tree(r, av1_mv_fp_tree,
                      class0 ? mvcomp->class0_fp[d] : mvcomp->fp, ACCT_STR);
+#endif
 
   // High precision part (if hp is not used, the default value of the hp is 1)
   hp = usehp ? aom_read(r, class0 ? mvcomp->class0_hp : mvcomp->hp, ACCT_STR)
@@ -531,7 +590,11 @@ static INLINE void read_mv(aom_reader *r, MV *mv, const MV *ref,
                            const nmv_context *ctx, nmv_context_counts *counts,
                            int allow_hp) {
   const MV_JOINT_TYPE joint_type =
+#if CONFIG_DAALA_EC
+      (MV_JOINT_TYPE)aom_read_symbol(r, ctx->joint_cdf, MV_JOINTS, ACCT_STR);
+#else
       (MV_JOINT_TYPE)aom_read_tree(r, av1_mv_joint_tree, ctx->joints, ACCT_STR);
+#endif
   const int use_hp = allow_hp && av1_use_mv_hp(ref);
   MV diff = { 0, 0 };
 

@@ -103,9 +103,12 @@ typedef struct frame_contexts {
   aom_prob inter_ext_tx_prob[EXT_TX_SIZES][TX_TYPES - 1];
   int initialized;
 #if CONFIG_DAALA_EC
+  aom_cdf_prob y_mode_cdf[BLOCK_SIZE_GROUPS][INTRA_MODES];
+  aom_cdf_prob uv_mode_cdf[INTRA_MODES][INTRA_MODES];
   aom_cdf_prob partition_cdf[PARTITION_CONTEXTS][PARTITION_TYPES];
   aom_cdf_prob
       switchable_interp_cdf[SWITCHABLE_FILTER_CONTEXTS][SWITCHABLE_FILTERS];
+  aom_cdf_prob inter_mode_cdf[INTER_MODE_CONTEXTS][INTER_MODES];
   aom_cdf_prob intra_ext_tx_cdf[EXT_TX_SIZES][TX_TYPES][TX_TYPES];
   aom_cdf_prob inter_ext_tx_cdf[EXT_TX_SIZES][TX_TYPES];
 #endif
@@ -158,6 +161,9 @@ typedef struct FRAME_COUNTS {
 
 extern const aom_prob
     av1_kf_y_mode_prob[INTRA_MODES][INTRA_MODES][INTRA_MODES - 1];
+#if CONFIG_DAALA_EC
+extern aom_cdf_prob av1_kf_y_mode_cdf[INTRA_MODES][INTRA_MODES][INTRA_MODES];
+#endif
 
 #if CONFIG_PALETTE
 extern const aom_prob av1_default_palette_y_mode_prob[PALETTE_BLOCK_SIZES]
@@ -175,6 +181,12 @@ extern const aom_prob av1_default_palette_uv_color_prob
 
 extern const aom_tree_index av1_intra_mode_tree[TREE_SIZE(INTRA_MODES)];
 extern const aom_tree_index av1_inter_mode_tree[TREE_SIZE(INTER_MODES)];
+#if CONFIG_DAALA_EC
+extern int av1_intra_mode_ind[INTRA_MODES];
+extern int av1_intra_mode_inv[INTRA_MODES];
+extern int av1_inter_mode_ind[INTER_MODES];
+extern int av1_inter_mode_inv[INTER_MODES];
+#endif
 #if CONFIG_MOTION_VAR
 extern const aom_tree_index av1_motion_mode_tree[TREE_SIZE(MOTION_MODES)];
 #endif  // CONFIG_MOTION_VAR

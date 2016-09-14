@@ -114,13 +114,19 @@ void av1_encode_token_init() {
       structure. */
   av1_indices_from_tree(av1_ext_tx_ind, av1_ext_tx_inv, TX_TYPES,
                         av1_ext_tx_tree);
+  av1_indices_from_tree(av1_intra_mode_ind, av1_intra_mode_inv, INTRA_MODES,
+                        av1_intra_mode_tree);
+  av1_indices_from_tree(av1_inter_mode_ind, av1_inter_mode_inv, INTER_MODES,
+                        av1_inter_mode_tree);
 #endif
 }
 
+#if !CONFIG_DAALA_EC
 static void write_intra_mode(aom_writer *w, PREDICTION_MODE mode,
                              const aom_prob *probs) {
   av1_write_token(w, av1_intra_mode_tree, probs, &intra_mode_encodings[mode]);
 }
+#endif
 
 static void write_inter_mode(AV1_COMMON *cm, aom_writer *w,
                              PREDICTION_MODE mode, const int16_t mode_ctx) {
@@ -152,10 +158,17 @@ static void write_inter_mode(AV1_COMMON *cm, aom_writer *w,
     }
   }
 #else
-  const aom_prob *const inter_probs = cm->fc->inter_mode_probs[mode_ctx];
   assert(is_inter_mode(mode));
-  av1_write_token(w, av1_inter_mode_tree, inter_probs,
-                  &inter_mode_encodings[INTER_OFFSET(mode)]);
+#if CONFIG_DAALA_EC
+  aom_write_symbol(w, av1_inter_mode_ind[INTER_OFFSET(mode)],
+                   cm->fc->inter_mode_cdf[mode_ctx], INTER_MODES);
+#else
+  {
+    const aom_prob *const inter_probs = cm->fc->inter_mode_probs[mode_ctx];
+    av1_write_token(w, av1_inter_mode_tree, inter_probs,
+                    &inter_mode_encodings[INTER_OFFSET(mode)]);
+  }
+#endif
 #endif
 }
 
@@ -725,7 +738,13 @@ static void pack_inter_mode_mvs(AV1_COMP *cpi, const MODE_INFO *mi,
 
   if (!is_inter) {
     if (bsize >= BLOCK_8X8) {
+#if CONFIG_DAALA_EC
+      aom_write_symbol(w, av1_intra_mode_ind[mode],
+                       cm->fc->y_mode_cdf[size_group_lookup[bsize]],
+                       INTRA_MODES);
+#else
       write_intra_mode(w, mode, cm->fc->y_mode_prob[size_group_lookup[bsize]]);
+#endif
     } else {
       int idx, idy;
       const int num_4x4_w = num_4x4_blocks_wide_lookup[bsize];
@@ -733,11 +752,21 @@ static void pack_inter_mode_mvs(AV1_COMP *cpi, const MODE_INFO *mi,
       for (idy = 0; idy < 2; idy += num_4x4_h) {
         for (idx = 0; idx < 2; idx += num_4x4_w) {
           const PREDICTION_MODE b_mode = mi->bmi[idy * 2 + idx].as_mode;
+#if CONFIG_DAALA_EC
+          aom_write_symbol(w, av1_intra_mode_ind[b_mode], cm->fc->y_mode_cdf[0],
+                           INTRA_MODES);
+#else
           write_intra_mode(w, b_mode, cm->fc->y_mode_prob[0]);
+#endif
         }
       }
     }
+#if CONFIG_DAALA_EC
+    aom_write_symbol(w, av1_intra_mode_ind[mbmi->uv_mode],
+                     cm->fc->uv_mode_cdf[mode], INTRA_MODES);
+#else
     write_intra_mode(w, mbmi->uv_mode, cm->fc->uv_mode_prob[mode]);
+#endif
 #if CONFIG_EXT_INTRA
     write_intra_angle_info(mbmi, w);
 #endif  // CONFIG_EXT_INTRA
@@ -878,8 +907,13 @@ static void write_mb_modes_kf(const AV1_COMMON *cm, const MACROBLOCKD *xd,
     write_selected_tx_size(cm, xd, w);
 
   if (bsize >= BLOCK_8X8) {
+#if CONFIG_DAALA_EC
+    aom_write_symbol(w, av1_intra_mode_ind[mbmi->mode],
+                     get_y_mode_cdf(cm, mi, above_mi, left_mi, 0), INTRA_MODES);
+#else
     write_intra_mode(w, mbmi->mode,
                      get_y_mode_probs(cm, mi, above_mi, left_mi, 0));
+#endif
   } else {
     const int num_4x4_w = num_4x4_blocks_wide_lookup[bsize];
     const int num_4x4_h = num_4x4_blocks_high_lookup[bsize];
@@ -888,13 +922,23 @@ static void write_mb_modes_kf(const AV1_COMMON *cm, const MACROBLOCKD *xd,
     for (idy = 0; idy < 2; idy += num_4x4_h) {
       for (idx = 0; idx < 2; idx += num_4x4_w) {
         const int block = idy * 2 + idx;
+#if CONFIG_DAALA_EC
+        aom_write_symbol(w, av1_intra_mode_ind[mi->bmi[block].as_mode],
+                         get_y_mode_cdf(cm, mi, above_mi, left_mi, block),
+                         INTRA_MODES);
+#else
         write_intra_mode(w, mi->bmi[block].as_mode,
                          get_y_mode_probs(cm, mi, above_mi, left_mi, block));
+#endif
       }
     }
   }
-
+#if CONFIG_DAALA_EC
+  aom_write_symbol(w, av1_intra_mode_ind[mbmi->uv_mode],
+                   cm->fc->uv_mode_cdf[mbmi->mode], INTRA_MODES);
+#else
   write_intra_mode(w, mbmi->uv_mode, cm->fc->uv_mode_prob[mbmi->mode]);
+#endif
 #if CONFIG_EXT_INTRA
   write_intra_angle_info(mbmi, w);
 #endif  // CONFIG_EXT_INTRA
@@ -906,11 +950,19 @@ static void write_mb_modes_kf(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 
   if (mbmi->tx_size < TX_32X32 && cm->base_qindex > 0 && !mbmi->skip &&
       !segfeature_active(&cm->seg, mbmi->segment_id, SEG_LVL_SKIP)) {
+#if CONFIG_DAALA_EC
+    aom_write_symbol(
+        w, av1_ext_tx_ind[mbmi->tx_type],
+        cm->fc->intra_ext_tx_cdf[mbmi->tx_size]
+                                [intra_mode_to_tx_type_context[mbmi->mode]],
+        TX_TYPES);
+#else
     av1_write_token(
         w, av1_ext_tx_tree,
         cm->fc->intra_ext_tx_prob[mbmi->tx_size]
                                  [intra_mode_to_tx_type_context[mbmi->mode]],
         &ext_tx_encodings[mbmi->tx_type]);
+#endif
   }
 }
 
@@ -2094,9 +2146,14 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
 #if CONFIG_MISC_FIXES
   update_seg_probs(cpi, header_bc);
 
-  for (i = 0; i < INTRA_MODES; ++i)
+  for (i = 0; i < INTRA_MODES; ++i) {
     prob_diff_update(av1_intra_mode_tree, fc->uv_mode_prob[i],
                      counts->uv_mode[i], INTRA_MODES, header_bc);
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_intra_mode_tree, fc->uv_mode_prob[i],
+                    fc->uv_mode_cdf[i]);
+#endif
+  }
 
   for (i = 0; i < PARTITION_CONTEXTS; ++i) {
     prob_diff_update(av1_partition_tree, fc->partition_prob[i],
@@ -2110,19 +2167,32 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
 
   if (frame_is_intra_only(cm)) {
     av1_copy(cm->kf_y_prob, av1_kf_y_mode_prob);
+#if CONFIG_DAALA_EC
+    av1_copy(cm->kf_y_cdf, av1_kf_y_mode_cdf);
+#endif
 #if CONFIG_MISC_FIXES
     for (i = 0; i < INTRA_MODES; ++i)
-      for (j = 0; j < INTRA_MODES; ++j)
+      for (j = 0; j < INTRA_MODES; ++j) {
         prob_diff_update(av1_intra_mode_tree, cm->kf_y_prob[i][j],
                          counts->kf_y_mode[i][j], INTRA_MODES, header_bc);
+#if CONFIG_DAALA_EC
+        av1_tree_to_cdf(av1_intra_mode_tree, cm->kf_y_prob[i][j],
+                        cm->kf_y_cdf[i][j]);
+#endif
+      }
 #endif
   } else {
 #if CONFIG_REF_MV
     update_inter_mode_probs(cm, header_bc, counts);
 #else
-    for (i = 0; i < INTER_MODE_CONTEXTS; ++i)
+    for (i = 0; i < INTER_MODE_CONTEXTS; ++i) {
       prob_diff_update(av1_inter_mode_tree, cm->fc->inter_mode_probs[i],
                        counts->inter_mode[i], INTER_MODES, header_bc);
+#if CONFIG_DAALA_EC
+      av1_tree_to_cdf(av1_inter_mode_tree, cm->fc->inter_mode_probs[i],
+                      cm->fc->inter_mode_cdf[i]);
+#endif
+    }
 #endif
 #if CONFIG_MOTION_VAR
     for (i = 0; i < BLOCK_SIZES; ++i)
@@ -2180,9 +2250,14 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
                                   counts->comp_ref[i]);
 #endif  // CONFIG_EXT_REFS
 
-    for (i = 0; i < BLOCK_SIZE_GROUPS; ++i)
+    for (i = 0; i < BLOCK_SIZE_GROUPS; ++i) {
       prob_diff_update(av1_intra_mode_tree, cm->fc->y_mode_prob[i],
                        counts->y_mode[i], INTRA_MODES, header_bc);
+#if CONFIG_DAALA_EC
+      av1_tree_to_cdf(av1_intra_mode_tree, cm->fc->y_mode_prob[i],
+                      cm->fc->y_mode_cdf[i]);
+#endif
+    }
 
 #if !CONFIG_MISC_FIXES
     for (i = 0; i < PARTITION_CONTEXTS; ++i) {
@@ -2200,6 +2275,10 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
                         counts->mv);
 #else
                         &counts->mv);
+#endif
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_mv_joint_tree, cm->fc->nmvc.joints,
+                    cm->fc->nmvc.joint_cdf);
 #endif
     update_ext_tx_probs(cm, header_bc);
   }

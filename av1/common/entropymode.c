@@ -146,6 +146,9 @@ const aom_prob av1_kf_y_mode_prob[INTRA_MODES][INTRA_MODES][INTRA_MODES - 1] = {
       { 43, 81, 53, 140, 169, 204, 68, 84, 72 }     // left = tm
   }
 };
+#if CONFIG_DAALA_EC
+aom_cdf_prob av1_kf_y_mode_cdf[INTRA_MODES][INTRA_MODES][INTRA_MODES];
+#endif
 
 static const aom_prob default_if_y_probs[BLOCK_SIZE_GROUPS][INTRA_MODES - 1] = {
   { 65, 32, 18, 144, 162, 194, 41, 51, 98 },   // block_size < 8x8
@@ -218,6 +221,11 @@ static const aom_prob
       { 17, 81, 31 },  // 5 = one intra neighbour + x
       { 25, 29, 30 },  // 6 = two intra neighbours
     };
+
+int av1_intra_mode_ind[INTRA_MODES];
+int av1_intra_mode_inv[INTRA_MODES];
+int av1_inter_mode_ind[INTER_MODES];
+int av1_inter_mode_inv[INTER_MODES];
 
 /* Array indices are identical to previously-existing INTRAMODECONTEXTNODES. */
 const aom_tree_index av1_intra_mode_tree[TREE_SIZE(INTRA_MODES)] = {
@@ -860,14 +868,22 @@ static void init_mode_probs(FRAME_CONTEXT *fc) {
   av1_copy(fc->intra_ext_tx_prob, default_intra_ext_tx_prob);
   av1_copy(fc->inter_ext_tx_prob, default_inter_ext_tx_prob);
 #if CONFIG_DAALA_EC
+  av1_tree_to_cdf_1D(av1_intra_mode_tree, fc->y_mode_prob, fc->y_mode_cdf,
+                     BLOCK_SIZE_GROUPS);
+  av1_tree_to_cdf_1D(av1_intra_mode_tree, fc->uv_mode_prob, fc->uv_mode_cdf,
+                     INTRA_MODES);
   av1_tree_to_cdf_1D(av1_switchable_interp_tree, fc->switchable_interp_prob,
                      fc->switchable_interp_cdf, SWITCHABLE_FILTER_CONTEXTS);
+  av1_tree_to_cdf_1D(av1_partition_tree, fc->partition_prob, fc->partition_cdf,
+                     PARTITION_CONTEXTS);
+  av1_tree_to_cdf_1D(av1_inter_mode_tree, fc->inter_mode_probs,
+                     fc->inter_mode_cdf, INTER_MODE_CONTEXTS);
   av1_tree_to_cdf_2D(av1_ext_tx_tree, fc->intra_ext_tx_prob,
                      fc->intra_ext_tx_cdf, EXT_TX_SIZES, TX_TYPES);
   av1_tree_to_cdf_1D(av1_ext_tx_tree, fc->inter_ext_tx_prob,
                      fc->inter_ext_tx_cdf, EXT_TX_SIZES);
-  av1_tree_to_cdf_1D(av1_partition_tree, fc->partition_prob, fc->partition_cdf,
-                     PARTITION_CONTEXTS);
+  av1_tree_to_cdf_2D(av1_intra_mode_tree, av1_kf_y_mode_prob, av1_kf_y_mode_cdf,
+                     INTRA_MODES, INTRA_MODES);
 #if CONFIG_MISC_FIXES
   av1_tree_to_cdf(av1_segment_tree, fc->seg.tree_probs, fc->seg.tree_cdf);
 #endif

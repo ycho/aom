@@ -165,9 +165,14 @@ static void read_inter_mode_probs(FRAME_CONTEXT *fc, aom_reader *r) {
     av1_diff_update_prob(r, &fc->drl_prob[i], ACCT_STR);
 #else
   int j;
-  for (i = 0; i < INTER_MODE_CONTEXTS; ++i)
+  for (i = 0; i < INTER_MODE_CONTEXTS; ++i) {
     for (j = 0; j < INTER_MODES - 1; ++j)
       av1_diff_update_prob(r, &fc->inter_mode_probs[i][j], ACCT_STR);
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_inter_mode_tree, fc->inter_mode_probs[i],
+                    fc->inter_mode_cdf[i]);
+#endif
+  }
 #endif
 }
 
@@ -237,6 +242,9 @@ static void read_mv_probs(nmv_context *ctx, int allow_hp, aom_reader *r) {
   int i, j;
 
   update_mv_probs(ctx->joints, MV_JOINTS - 1, r);
+#if CONFIG_DAALA_EC
+  av1_tree_to_cdf(av1_mv_joint_tree, ctx->joints, ctx->joint_cdf);
+#endif
 
   for (i = 0; i < 2; ++i) {
     nmv_component *const comp_ctx = &ctx->comps[i];
@@ -244,13 +252,24 @@ static void read_mv_probs(nmv_context *ctx, int allow_hp, aom_reader *r) {
     update_mv_probs(comp_ctx->classes, MV_CLASSES - 1, r);
     update_mv_probs(comp_ctx->class0, CLASS0_SIZE - 1, r);
     update_mv_probs(comp_ctx->bits, MV_OFFSET_BITS, r);
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_mv_class_tree, comp_ctx->classes, comp_ctx->class_cdf);
+#endif
   }
 
   for (i = 0; i < 2; ++i) {
     nmv_component *const comp_ctx = &ctx->comps[i];
-    for (j = 0; j < CLASS0_SIZE; ++j)
+    for (j = 0; j < CLASS0_SIZE; ++j) {
       update_mv_probs(comp_ctx->class0_fp[j], MV_FP_SIZE - 1, r);
-    update_mv_probs(comp_ctx->fp, 3, r);
+#if CONFIG_DAALA_EC
+      av1_tree_to_cdf(av1_mv_fp_tree, comp_ctx->class0_fp[j],
+                      comp_ctx->class0_fp_cdf[j]);
+#endif
+    }
+    update_mv_probs(comp_ctx->fp, MV_FP_SIZE - 1, r);
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_mv_fp_tree, comp_ctx->fp, comp_ctx->fp_cdf);
+#endif
   }
 
   if (allow_hp) {
@@ -2313,9 +2332,14 @@ static int read_compressed_header(AV1Decoder *pbi, const uint8_t *data,
 #endif
   }
 
-  for (j = 0; j < INTRA_MODES; j++)
+  for (j = 0; j < INTRA_MODES; j++) {
     for (i = 0; i < INTRA_MODES - 1; ++i)
       av1_diff_update_prob(&r, &fc->uv_mode_prob[j][i], ACCT_STR);
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_intra_mode_tree, fc->uv_mode_prob[j],
+                    fc->uv_mode_cdf[j]);
+#endif
+  }
 
   for (j = 0; j < PARTITION_CONTEXTS; ++j) {
     for (i = 0; i < PARTITION_TYPES - 1; ++i)
@@ -2329,11 +2353,19 @@ static int read_compressed_header(AV1Decoder *pbi, const uint8_t *data,
 
   if (frame_is_intra_only(cm)) {
     av1_copy(cm->kf_y_prob, av1_kf_y_mode_prob);
+#if CONFIG_DAALA_EC
+    av1_copy(cm->kf_y_cdf, av1_kf_y_mode_cdf);
+#endif
 #if CONFIG_MISC_FIXES
     for (k = 0; k < INTRA_MODES; k++)
-      for (j = 0; j < INTRA_MODES; j++)
+      for (j = 0; j < INTRA_MODES; j++) {
         for (i = 0; i < INTRA_MODES - 1; ++i)
           av1_diff_update_prob(&r, &cm->kf_y_prob[k][j][i], ACCT_STR);
+#if CONFIG_DAALA_EC
+        av1_tree_to_cdf(av1_intra_mode_tree, cm->kf_y_prob[k][j],
+                        cm->kf_y_cdf[k][j]);
+#endif
+      }
 #endif
   } else {
 #if !CONFIG_REF_MV
@@ -2361,9 +2393,14 @@ static int read_compressed_header(AV1Decoder *pbi, const uint8_t *data,
       setup_compound_reference_mode(cm);
     read_frame_reference_mode_probs(cm, &r);
 
-    for (j = 0; j < BLOCK_SIZE_GROUPS; j++)
+    for (j = 0; j < BLOCK_SIZE_GROUPS; j++) {
       for (i = 0; i < INTRA_MODES - 1; ++i)
         av1_diff_update_prob(&r, &fc->y_mode_prob[j][i], ACCT_STR);
+#if CONFIG_DAALA_EC
+      av1_tree_to_cdf(av1_intra_mode_tree, fc->y_mode_prob[j],
+                      fc->y_mode_cdf[j]);
+#endif
+    }
 
 #if !CONFIG_MISC_FIXES
     for (j = 0; j < PARTITION_CONTEXTS; ++j) {
