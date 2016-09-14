@@ -552,18 +552,18 @@ void av1_xform_quant_fp(MACROBLOCK *x, int plane, int block, int blk_row,
 
   // PVQ for inter mode block
   if (!x->skip_block)
-    skip = pvq_encode_helper(&x->daala_enc,
-                             coeff,        // target original vector
-                             ref_coeff,    // reference vector
-                             dqcoeff,      // de-quantized vector
-                             eob,          // End of Block marker
-                             pd->dequant,  // aom's quantizers
-                             plane,        // image plane
-                             tx_size,      // block size in log_2 - 2
-                             tx_type,
-                             &x->rate,  // rate measured
-                             x->pvq_speed,
-                             pvq_info);  // PVQ info for a block
+    skip = av1_pvq_encode_helper(&x->daala_enc,
+                                 coeff,        // target original vector
+                                 ref_coeff,    // reference vector
+                                 dqcoeff,      // de-quantized vector
+                                 eob,          // End of Block marker
+                                 pd->dequant,  // aom's quantizers
+                                 plane,        // image plane
+                                 tx_size,      // block size in log_2 - 2
+                                 tx_type,
+                                 &x->rate,  // rate measured
+                                 x->pvq_speed,
+                                 pvq_info);  // PVQ info for a block
 
   x->pvq_skip[plane] = skip;
 
@@ -860,18 +860,18 @@ void av1_xform_quant(MACROBLOCK *x, int plane, int block, int blk_row,
 
   // PVQ for inter mode block
   if (!x->skip_block)
-    skip = pvq_encode_helper(&x->daala_enc,
-                             coeff,        // target original vector
-                             ref_coeff,    // reference vector
-                             dqcoeff,      // de-quantized vector
-                             eob,          // End of Block marker
-                             pd->dequant,  // aom's quantizers
-                             plane,        // image plane
-                             tx_size,      // block size in log_2 - 2
-                             tx_type,
-                             &x->rate,  // rate measured
-                             x->pvq_speed,
-                             pvq_info);  // PVQ info for a block
+    skip = av1_pvq_encode_helper(&x->daala_enc,
+                                 coeff,        // target original vector
+                                 ref_coeff,    // reference vector
+                                 dqcoeff,      // de-quantized vector
+                                 eob,          // End of Block marker
+                                 pd->dequant,  // aom's quantizers
+                                 plane,        // image plane
+                                 tx_size,      // block size in log_2 - 2
+                                 tx_type,
+                                 &x->rate,  // rate measured
+                                 x->pvq_speed,
+                                 pvq_info);  // PVQ info for a block
 
   x->pvq_skip[plane] = skip;
 
@@ -1293,18 +1293,18 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
 
   // PVQ for intra mode block
   if (!x->skip_block)
-    skip = pvq_encode_helper(&x->daala_enc,
-                             coeff,        // target original vector
-                             ref_coeff,    // reference vector
-                             dqcoeff,      // de-quantized vector
-                             eob,          // End of Block marker
-                             pd->dequant,  // aom's quantizers
-                             plane,        // image plane
-                             tx_size,      // block size in log_2 - 2
-                             tx_type,
-                             &x->rate,  // rate measured
-                             x->pvq_speed,
-                             pvq_info);  // PVQ info for a block
+    skip = av1_pvq_encode_helper(&x->daala_enc,
+                                 coeff,        // target original vector
+                                 ref_coeff,    // reference vector
+                                 dqcoeff,      // de-quantized vector
+                                 eob,          // End of Block marker
+                                 pd->dequant,  // aom's quantizers
+                                 plane,        // image plane
+                                 tx_size,      // block size in log_2 - 2
+                                 tx_type,
+                                 &x->rate,  // rate measured
+                                 x->pvq_speed,
+                                 pvq_info);  // PVQ info for a block
 
   x->pvq_skip[plane] = skip;
 
@@ -1358,11 +1358,11 @@ void av1_encode_intra_block_plane(MACROBLOCK *x, BLOCK_SIZE bsize, int plane) {
 }
 
 #if CONFIG_PVQ
-int pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
-                      tran_low_t *ref_coeff, tran_low_t *const dqcoeff,
-                      uint16_t *eob, const int16_t *quant, int plane,
-                      int tx_size, TX_TYPE tx_type, int *rate,
-                      int speed, PVQ_INFO *pvq_info) {
+int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
+                          tran_low_t *ref_coeff, tran_low_t *const dqcoeff,
+                          uint16_t *eob, const int16_t *quant, int plane,
+                          int tx_size, TX_TYPE tx_type, int *rate,
+                          int speed, PVQ_INFO *pvq_info) {
   const int tx_blk_size = 1 << (tx_size + 2);
   int skip;
   // TODO(yushin): Enable this later, if pvq_qm_q4 is available in AOM.
@@ -1459,10 +1459,10 @@ int pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
   return skip;
 }
 
-void store_pvq_enc_info(PVQ_INFO *pvq_info, int *qg, int *theta, int *max_theta,
-                        int *k, od_coeff *y, int nb_bands, const int *off,
-                        int *size, int skip_rest, int skip_dir,
-                        int bs) {  // block size in log_2 -2
+void av1_store_pvq_enc_info(PVQ_INFO *pvq_info, int *qg, int *theta, int *max_theta,
+                            int *k, od_coeff *y, int nb_bands, const int *off,
+                            int *size, int skip_rest, int skip_dir,
+                            int bs) {  // block size in log_2 -2
   int i;
   const int tx_blk_size = 1 << (bs + 2);
 

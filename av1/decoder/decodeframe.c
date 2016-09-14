@@ -395,9 +395,9 @@ static void inverse_transform_block_intra(MACROBLOCKD *xd, int plane,
 }
 
 #if CONFIG_PVQ
-static int pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
-                             int16_t *dqcoeff, int16_t *quant, int pli, int bs,
-                             TX_TYPE tx_type, int xdec, int ac_dc_coded) {
+static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
+                                 int16_t *dqcoeff, int16_t *quant, int pli, int bs,
+                                 TX_TYPE tx_type, int xdec, int ac_dc_coded) {
   unsigned int flags;  // used for daala's stream analyzer.
   int off;
   const int is_keyframe = 0;
@@ -536,8 +536,8 @@ static void predict_and_reconstruct_intra_block(MACROBLOCKD *const xd,
 
       quant = &pd->seg_dequant[seg_id][0];  // aom's quantizer
 
-      eob = pvq_decode_helper(&xd->daala_dec, pvq_ref_coeff, dqcoeff, quant,
-                              plane, tx_size, tx_type, xdec, ac_dc_coded);
+      eob = av1_pvq_decode_helper(&xd->daala_dec, pvq_ref_coeff, dqcoeff, quant,
+                                  plane, tx_size, tx_type, xdec, ac_dc_coded);
 
       // Since av1 does not have separate inverse transform
       // but also contains adding to predicted image,
@@ -615,8 +615,8 @@ static int reconstruct_inter_block(MACROBLOCKD *const xd, aom_reader *r,
 
     quant = &pd->seg_dequant[seg_id][0];  // aom's DC quantizer
 
-    eob = pvq_decode_helper(&xd->daala_dec, pvq_ref_coeff, dqcoeff, quant,
-                            plane, tx_size, tx_type, xdec, ac_dc_coded);
+    eob = av1_pvq_decode_helper(&xd->daala_dec, pvq_ref_coeff, dqcoeff, quant,
+                                plane, tx_size, tx_type, xdec, ac_dc_coded);
 
     // Since av1 does not have separate inverse transform
     // but also contains adding to predicted image,
@@ -683,11 +683,12 @@ static void decode_block(AV1Decoder *const pbi, MACROBLOCKD *const xd,
   const int x_mis = AOMMIN(bw, cm->mi_cols - mi_col);
   const int y_mis = AOMMIN(bh, cm->mi_rows - mi_row);
 
+  MB_MODE_INFO *mbmi = set_offsets(cm, xd, bsize, mi_row, mi_col, bw, bh, x_mis,
+                                   y_mis, bwl, bhl);
+
 #if CONFIG_ACCOUNTING
   aom_accounting_set_context(&pbi->accounting, mi_col, mi_row);
 #endif
-  MB_MODE_INFO *mbmi = set_offsets(cm, xd, bsize, mi_row, mi_col, bw, bh, x_mis,
-                                   y_mis, bwl, bhl);
 
   if (bsize >= BLOCK_8X8 && (cm->subsampling_x || cm->subsampling_y)) {
     const BLOCK_SIZE uv_subsize =
@@ -1537,11 +1538,12 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
 #if CONFIG_ACCOUNTING
       tile_data->bit_reader.accounting = &pbi->accounting;
 #endif
-#if !CONFIG_PVQ
-      av1_init_macroblockd(cm, &tile_data->xd, tile_data->dqcoeff);
-#else
-      av1_init_macroblockd(cm, &tile_data->xd, tile_data->dqcoeff,
-                           tile_data->pvq_ref_coeff);
+      av1_init_macroblockd(cm, &tile_data->xd,
+#if CONFIG_PVQ
+                           tile_data->pvq_ref_coeff,
+#endif
+                           tile_data->dqcoeff);
+#if CONFIG_PVQ
       daala_dec_init(&tile_data->xd.daala_dec, &tile_data->bit_reader.ec);
 #endif
 #if CONFIG_PALETTE
@@ -1789,11 +1791,12 @@ static const uint8_t *decode_tiles_mt(AV1Decoder *pbi, const uint8_t *data,
       setup_token_decoder(buf->data, data_end, buf->size, &cm->error,
                           &tile_data->bit_reader, pbi->decrypt_cb,
                           pbi->decrypt_state);
-#if !CONFIG_PVQ
-      av1_init_macroblockd(cm, &tile_data->xd, tile_data->dqcoeff);
-#else
-      av1_init_macroblockd(cm, &tile_data->xd, tile_data->dqcoeff,
-                           tile_data->pvq_ref_coeff);
+      av1_init_macroblockd(cm, &tile_data->xd,
+#if CONFIG_PVQ
+                           tile_data->pvq_ref_coeff,
+#endif
+                           tile_data->dqcoeff);
+#if CONFIG_PVQ
       daala_dec_init(&tile_data->xd.daala_dec, &tile_data->bit_reader.ec);
 #endif
 #if CONFIG_PALETTE

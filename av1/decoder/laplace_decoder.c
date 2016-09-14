@@ -1,27 +1,13 @@
-/*Daala video codec
-Copyright (c) 2012 Daala project contributors.  All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-- Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-- Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
-
+/*
+ * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ *
+ * This source code is subject to the terms of the BSD 2 Clause License and
+ * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
+ * was not distributed with this source code in the LICENSE file, you can
+ * obtain it at www.aomedia.org/license/software. If the Alliance for Open
+ * Media Patent License 1.0 was not distributed with this source code in the
+ * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ */
 /* clang-format off */
 
 #ifdef HAVE_CONFIG_H
@@ -99,7 +85,7 @@ void od_decode_band_pvq_splits(od_ec_dec *ec, od_pvq_codeword_ctx *adapt,
  *
  * @retval decoded variable x
  */
-int laplace_decode_special_(od_ec_dec *dec, unsigned decay, int max OD_ACC_STR) {
+int od_laplace_decode_special_(od_ec_dec *dec, unsigned decay, int max OD_ACC_STR) {
   int pos;
   int shift;
   int xs;
@@ -158,7 +144,7 @@ int laplace_decode_special_(od_ec_dec *dec, unsigned decay, int max OD_ACC_STR) 
  *
  * @retval decoded variable (including sign)
  */
-int laplace_decode_(od_ec_dec *dec, unsigned ex_q8, int k OD_ACC_STR) {
+int od_laplace_decode_(od_ec_dec *dec, unsigned ex_q8, int k OD_ACC_STR) {
   int j;
   int shift;
   uint16_t cdf[16];
@@ -273,7 +259,7 @@ static void laplace_decode_vector_delta_(od_ec_dec *dec, od_coeff *y, int n, int
  * @param [out]    curr  Adaptation context output, may alias means.
  * @param [in]     means Adaptation context input.
  */
-void laplace_decode_vector_(od_ec_dec *dec, od_coeff *y, int n, int k,
+void od_laplace_decode_vector_(od_ec_dec *dec, od_coeff *y, int n, int k,
                            int32_t *curr, const int32_t *means OD_ACC_STR) {
   int i;
   int sum_ex;

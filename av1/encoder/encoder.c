@@ -747,11 +747,11 @@ static void update_frame_size(AV1_COMP *cpi) {
 
   av1_set_mb_mi(cm, cm->width, cm->height);
   av1_init_context_buffers(cm);
-#if !CONFIG_PVQ
-  av1_init_macroblockd(cm, xd, NULL);
-#else
-  av1_init_macroblockd(cm, xd, NULL, NULL);
+  av1_init_macroblockd(cm, xd,
+#if CONFIG_PVQ
+                       NULL,
 #endif
+                       NULL);
   memset(cpi->mbmi_ext_base, 0,
          cm->mi_rows * cm->mi_cols * sizeof(*cpi->mbmi_ext_base));
 

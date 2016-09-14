@@ -331,8 +331,7 @@ static void model_rd_for_sb(const AV1_COMP *const cpi, BLOCK_SIZE bsize,
 int64_t av1_block_error2_c(const tran_low_t *coeff, const tran_low_t *dqcoeff,
                            const tran_low_t *ref, intptr_t block_size,
                            int64_t *ssz) {
-    int64_t error = 0;
-  int64_t pred_error = 0;
+  int64_t error = 0;
 
   // Use the existing sse codes for calculating distortion of decoded signal:
   // i.e. (orig - decoded)^2
@@ -1275,9 +1274,9 @@ static int64_t rd_pick_intra4x4block(const AV1_COMP *const cpi, MACROBLOCK *x,
                                scan_order->scan, scan_order->neighbors,
                                cpi->sf.use_fast_coef_costing);
 #else
-          skip = pvq_encode_helper(&x->daala_enc, coeff, ref_coeff, dqcoeff,
-                                   &p->eobs[block], pd->dequant, 0, TX_4X4,
-                                   tx_type, &rate_pvq, x->pvq_speed, NULL);
+          skip = av1_pvq_encode_helper(&x->daala_enc, coeff, ref_coeff, dqcoeff,
+                                       &p->eobs[block], pd->dequant, 0, TX_4X4,
+                                       tx_type, &rate_pvq, x->pvq_speed, NULL);
           ratey += rate_pvq;
 #endif
           if (RDCOST(x->rdmult, x->rddiv, ratey, distortion) >= best_rd)
@@ -1305,9 +1304,9 @@ static int64_t rd_pick_intra4x4block(const AV1_COMP *const cpi, MACROBLOCK *x,
                                scan_order->scan, scan_order->neighbors,
                                cpi->sf.use_fast_coef_costing);
 #else
-          skip = pvq_encode_helper(&x->daala_enc, coeff, ref_coeff, dqcoeff,
-                                   &p->eobs[block], pd->dequant, 0, TX_4X4,
-                                   tx_type, &rate_pvq, x->pvq_speed, NULL);
+          skip = av1_pvq_encode_helper(&x->daala_enc, coeff, ref_coeff, dqcoeff,
+                                       &p->eobs[block], pd->dequant, 0, TX_4X4,
+                                       tx_type, &rate_pvq, x->pvq_speed, NULL);
           ratey += rate_pvq;
 #endif
           // No need for av1_block_error2_c because the ssz is unused
@@ -2496,9 +2495,9 @@ static int64_t encode_inter_mb_segment(const AV1_COMP *const cpi, MACROBLOCK *x,
       fwd_txm4x4(src_int16, coeff, diff_stride);
       fwd_txm4x4(pred, ref_coeff, diff_stride);
 
-      pvq_encode_helper(&x->daala_enc, coeff, ref_coeff, dqcoeff, &p->eobs[k],
-                        pd->dequant, 0, TX_4X4, tx_type, &rate_pvq,
-                        x->pvq_speed, NULL);
+      av1_pvq_encode_helper(&x->daala_enc, coeff, ref_coeff, dqcoeff, &p->eobs[k],
+                            pd->dequant, 0, TX_4X4, tx_type, &rate_pvq,
+                            x->pvq_speed, NULL);
 #endif
 
 #if CONFIG_AOM_HIGHBITDEPTH

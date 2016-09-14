@@ -2755,8 +2755,8 @@ void av1_init_tile_data(AV1_COMP *cpi) {
 #if CONFIG_PVQ
         // This will be dynamically increased as more pvq block is encoded.
         tile_data->pvq_q.buf_len = 5000;
-        tile_data->pvq_q.buf =
-            aom_calloc(tile_data->pvq_q.buf_len, sizeof(PVQ_INFO));
+        CHECK_MEM_ERROR(cm, tile_data->pvq_q.buf,
+                        aom_calloc(tile_data->pvq_q.buf_len, sizeof(PVQ_INFO)));
         tile_data->pvq_q.curr_pos = 0;
 #endif
       }

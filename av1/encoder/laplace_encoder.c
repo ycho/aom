@@ -1,26 +1,13 @@
-/*Daala video codec
-Copyright (c) 2012 Daala project contributors.  All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-- Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-- Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
+/*
+ * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ *
+ * This source code is subject to the terms of the BSD 2 Clause License and
+ * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
+ * was not distributed with this source code in the LICENSE file, you can
+ * obtain it at www.aomedia.org/license/software. If the Alliance for Open
+ * Media Patent License 1.0 was not distributed with this source code in the
+ * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ */
 
 /* clang-format off */
 
@@ -90,7 +77,7 @@ void od_encode_band_pvq_splits(od_ec_enc *ec, od_pvq_codeword_ctx *adapt,
  * @param [in]     max     maximum possible value of x (used to truncate
  * the pdf)
  */
-void laplace_encode_special(od_ec_enc *enc, int x, unsigned decay, int max) {
+void od_laplace_encode_special(od_ec_enc *enc, int x, unsigned decay, int max) {
   int shift;
   int xs;
   int ms;
@@ -143,7 +130,7 @@ void laplace_encode_special(od_ec_enc *enc, int x, unsigned decay, int max) {
  * @param [in]     ExQ8 expectation of the absolute value of x in Q8
  * @param [in]     K    maximum value of |x|
  */
-void laplace_encode(od_ec_enc *enc, int x, int ex_q8, int k) {
+void od_laplace_encode(od_ec_enc *enc, int x, int ex_q8, int k) {
   int j;
   int shift;
   int xs;
@@ -179,7 +166,7 @@ void laplace_encode(od_ec_enc *enc, int x, int ex_q8, int k) {
   }
   /* Handle the exponentially-decaying tail of the distribution */
   OD_ASSERT(xs - 15 <= k - 15);
-  if (xs >= 15) laplace_encode_special(enc, xs - 15, decay, k - 15);
+  if (xs >= 15) od_laplace_encode_special(enc, xs - 15, decay, k - 15);
 }
 
 static void laplace_encode_vector_delta(od_ec_enc *enc, const od_coeff *y, int n, int k,
@@ -216,15 +203,15 @@ static void laplace_encode_vector_delta(od_ec_enc *enc, const od_coeff *y, int n
         }
         /*Update mean position.*/
         OD_ASSERT(count <= n - 1);
-        laplace_encode_special(enc, count, decay, n - 1);
+        od_laplace_encode_special(enc, count, decay, n - 1);
         first = 0;
       }
-      else laplace_encode(enc, count, coef*(n - prev)/k_left, n - prev - 1);
+      else od_laplace_encode(enc, count, coef*(n - prev)/k_left, n - prev - 1);
       sum_ex += 256*(n - prev);
       sum_c += count*k_left;
       od_ec_enc_bits(enc, y[i] < 0, 1);
       for (j = 0; j < mag - 1; j++) {
-        laplace_encode(enc, 0, coef*(n - i)/(k_left - 1 - j), n - i - 1);
+        od_laplace_encode(enc, 0, coef*(n - i)/(k_left - 1 - j), n - i - 1);
         sum_ex += 256*(n - i);
       }
       k_left -= mag;
@@ -254,7 +241,7 @@ static void laplace_encode_vector_delta(od_ec_enc *enc, const od_coeff *y, int n
  * @param [out]    curr  Adaptation context output, may alias means.
  * @param [in]     means Adaptation context input.
  */
-void laplace_encode_vector(od_ec_enc *enc, const od_coeff *y, int n, int k,
+void od_laplace_encode_vector(od_ec_enc *enc, const od_coeff *y, int n, int k,
                            int32_t *curr, const int32_t *means) {
   int i;
   int sum_ex;
@@ -291,7 +278,7 @@ void laplace_encode_vector(od_ec_enc *enc, const od_coeff *y, int n, int k,
     if (ex > kn*256) ex = kn*256;
     sum_ex += (2*256*kn + (n - i))/(2*(n - i));
     /* No need to encode the magnitude for the last bin. */
-    if (i != n - 1) laplace_encode(enc, x, ex, kn);
+    if (i != n - 1) od_laplace_encode(enc, x, ex, kn);
     if (x != 0) od_ec_enc_bits(enc, y[i] < 0, 1);
     kn -= x;
   }

@@ -108,8 +108,8 @@ AV1_COMMON_SRCS-yes += common/zigzag64.c
 AV1_COMMON_SRCS-yes += common/zigzag.h
 AV1_COMMON_SRCS-yes += common/generic_code.c
 AV1_COMMON_SRCS-yes += common/generic_code.h
-AV1_COMMON_SRCS-yes += common/state.c
-AV1_COMMON_SRCS-yes += common/state.h
+AV1_COMMON_SRCS-yes += common/pvq_state.c
+AV1_COMMON_SRCS-yes += common/pvq_state.h
 AV1_COMMON_SRCS-yes += common/laplace_tables.c
 endif
 

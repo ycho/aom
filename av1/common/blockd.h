@@ -30,7 +30,7 @@
 #include "av1/common/tile_common.h"
 #if CONFIG_PVQ
 #include "av1/common/pvq.h"
-#include "av1/common/state.h"
+#include "av1/common/pvq_state.h"
 #include "av1/decoder/decint.h"
 #endif
 
