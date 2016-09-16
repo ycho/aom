@@ -158,7 +158,9 @@ typedef struct AV1Common {
 #if CONFIG_CLPF
   int clpf_numblocks;
   int clpf_size;
-  int clpf_strength;
+  int clpf_strength_y;
+  int clpf_strength_u;
+  int clpf_strength_v;
   uint8_t *clpf_blocks;
 #endif
 
@@ -347,6 +349,11 @@ typedef struct AV1Common {
 #if CONFIG_DERING
   int dering_level;
 #endif
+#if CONFIG_DELTA_Q
+  int delta_q_present_flag;
+  // Resolution of delta quant
+  int delta_q_res;
+#endif
 } AV1_COMMON;
 
 // TODO(hkuang): Don't need to lock the whole pool after implementing atomic
@@ -447,7 +454,6 @@ static INLINE void av1_init_macroblockd(AV1_COMMON *cm, MACROBLOCKD *xd,
     }
     xd->fc = cm->fc;
   }
-
   xd->above_seg_context = cm->above_seg_context;
   xd->mi_stride = cm->mi_stride;
   xd->error_info = &cm->error;

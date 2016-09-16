@@ -195,6 +195,9 @@ typedef struct {
   int_mv mv[2];
   /* deringing gain *per-superblock* */
   int8_t dering_gain;
+#if CONFIG_DELTA_Q
+  int current_q_index;
+#endif
 } MB_MODE_INFO;
 
 typedef struct MODE_INFO {
@@ -332,6 +335,11 @@ typedef struct macroblockd {
   int corrupted;
 
   struct aom_internal_error_info *error_info;
+#if CONFIG_DELTA_Q
+  int prev_qindex;
+  int delta_qindex;
+  int current_qindex;
+#endif
 } MACROBLOCKD;
 
 static INLINE BLOCK_SIZE get_subsize(BLOCK_SIZE bsize,

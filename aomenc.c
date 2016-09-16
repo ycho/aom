@@ -394,7 +394,11 @@ static const arg_def_t frame_parallel_decoding =
 static const arg_def_t aq_mode = ARG_DEF(
     NULL, "aq-mode", 1,
     "Adaptive quantization mode (0: off (default), 1: variance 2: complexity, "
-    "3: cyclic refresh, 4: equator360)");
+#if CONFIG_DELTA_Q
+    "3: cyclic refresh, 4: delta quant)");
+#else
+    "3: cyclic refresh)");
+#endif
 static const arg_def_t frame_periodic_boost =
     ARG_DEF(NULL, "frame-boost", 1,
             "Enable frame periodic boost (0: off (default), 1: on)");

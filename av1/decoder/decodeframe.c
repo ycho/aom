@@ -29,6 +29,7 @@
 
 #include "av1/common/alloccommon.h"
 #if CONFIG_CLPF
+#include "aom/aom_image.h"
 #include "av1/common/clpf.h"
 #endif
 #include "av1/common/common.h"
@@ -719,6 +720,26 @@ static void decode_block(AV1Decoder *const pbi, MACROBLOCKD *const xd,
 
   av1_read_mode_info(pbi, xd, mi_row, mi_col, r, x_mis, y_mis);
 
+#if CONFIG_DELTA_Q
+  if (cm->delta_q_present_flag) {
+    int i;
+    for (i = 0; i < MAX_SEGMENTS; i++) {
+      xd->plane[0].seg_dequant[i][0] =
+          av1_dc_quant(xd->current_qindex, cm->y_dc_delta_q, cm->bit_depth);
+      xd->plane[0].seg_dequant[i][1] =
+          av1_ac_quant(xd->current_qindex, 0, cm->bit_depth);
+      xd->plane[1].seg_dequant[i][0] =
+          av1_dc_quant(xd->current_qindex, cm->uv_dc_delta_q, cm->bit_depth);
+      xd->plane[1].seg_dequant[i][1] =
+          av1_ac_quant(xd->current_qindex, cm->uv_ac_delta_q, cm->bit_depth);
+      xd->plane[2].seg_dequant[i][0] =
+          av1_dc_quant(xd->current_qindex, cm->uv_dc_delta_q, cm->bit_depth);
+      xd->plane[2].seg_dequant[i][1] =
+          av1_ac_quant(xd->current_qindex, cm->uv_ac_delta_q, cm->bit_depth);
+    }
+  }
+#endif
+
   if (mbmi->skip) {
     dec_reset_skip_context(xd);
   }
@@ -1066,8 +1087,10 @@ static void setup_loopfilter(struct loopfilter *lf,
 #if CONFIG_CLPF
 static void setup_clpf(AV1_COMMON *cm, struct aom_read_bit_buffer *rb) {
   cm->clpf_blocks = 0;
-  cm->clpf_strength = aom_rb_read_literal(rb, 2);
-  if (cm->clpf_strength) {
+  cm->clpf_strength_y = aom_rb_read_literal(rb, 2);
+  cm->clpf_strength_u = aom_rb_read_literal(rb, 2);
+  cm->clpf_strength_v = aom_rb_read_literal(rb, 2);
+  if (cm->clpf_strength_y) {
     cm->clpf_size = aom_rb_read_literal(rb, 2);
     if (cm->clpf_size) {
       int i;
@@ -1085,7 +1108,8 @@ static int clpf_bit(UNUSED int k, UNUSED int l,
                     UNUSED const YV12_BUFFER_CONFIG *org,
                     UNUSED const AV1_COMMON *cm, UNUSED int block_size,
                     UNUSED int w, UNUSED int h, UNUSED unsigned int strength,
-                    UNUSED unsigned int fb_size_log2, uint8_t *bit) {
+                    UNUSED unsigned int fb_size_log2, uint8_t *bit,
+                    UNUSED int comp) {
   return *bit;
 }
 #endif
@@ -2241,6 +2265,29 @@ static size_t read_uncompressed_header(AV1Decoder *pbi,
 
   setup_segmentation(cm, rb);
 
+#if CONFIG_DELTA_Q
+  {
+    struct segmentation *const seg = &cm->seg;
+    int segment_quantizer_active = 0;
+    for (i = 0; i < MAX_SEGMENTS; i++) {
+      if (segfeature_active(seg, i, SEG_LVL_ALT_Q)) {
+        segment_quantizer_active = 1;
+      }
+    }
+
+    cm->delta_q_res = 1;
+    if (segment_quantizer_active == 0) {
+      cm->delta_q_present_flag = aom_rb_read_bit(rb);
+    } else {
+      cm->delta_q_present_flag = 0;
+    }
+    if (cm->delta_q_present_flag) {
+      xd->prev_qindex = cm->base_qindex;
+      cm->delta_q_res = 1 << aom_rb_read_literal(rb, 2);
+    }
+  }
+#endif
+
   for (i = 0; i < MAX_SEGMENTS; ++i) {
     const int qindex = CONFIG_MISC_FIXES && cm->seg.enabled
                            ? av1_get_qindex(&cm->seg, i, cm->base_qindex)
@@ -2317,6 +2364,11 @@ static int read_compressed_header(AV1Decoder *pbi, const uint8_t *data,
 
   for (k = 0; k < SKIP_CONTEXTS; ++k)
     av1_diff_update_prob(&r, &fc->skip_probs[k], ACCT_STR);
+
+#if CONFIG_DELTA_Q
+  for (k = 0; k < DELTA_Q_CONTEXTS; ++k)
+    av1_diff_update_prob(&r, &fc->delta_q_prob[k], ACCT_STR);
+#endif
 
 #if CONFIG_MISC_FIXES
   if (cm->seg.enabled && cm->seg.update_map) {
@@ -2633,10 +2685,23 @@ void av1_decode_frame(AV1Decoder *pbi, const uint8_t *data,
   }
 
 #if CONFIG_CLPF
-  if (cm->clpf_strength && !cm->skip_loop_filter) {
-    av1_clpf_frame(&pbi->cur_buf->buf, 0, cm, !!cm->clpf_size,
-                   cm->clpf_strength + (cm->clpf_strength == 3),
-                   4 + cm->clpf_size, cm->clpf_blocks, clpf_bit);
+  if (!cm->skip_loop_filter) {
+    const YV12_BUFFER_CONFIG *const frame = &pbi->cur_buf->buf;
+    if (cm->clpf_strength_y) {
+      av1_clpf_frame(frame, NULL, cm, !!cm->clpf_size,
+                     cm->clpf_strength_y + (cm->clpf_strength_y == 3),
+                     4 + cm->clpf_size, cm->clpf_blocks, AOM_PLANE_Y, clpf_bit);
+    }
+    if (cm->clpf_strength_u) {
+      av1_clpf_frame(frame, NULL, cm, 0,
+                     cm->clpf_strength_u + (cm->clpf_strength_u == 3), 4, NULL,
+                     AOM_PLANE_U, NULL);
+    }
+    if (cm->clpf_strength_v) {
+      av1_clpf_frame(frame, NULL, cm, 0,
+                     cm->clpf_strength_v + (cm->clpf_strength_v == 3), 4, NULL,
+                     AOM_PLANE_V, NULL);
+    }
   }
   if (cm->clpf_blocks) aom_free(cm->clpf_blocks);
 #endif
