@@ -807,6 +807,8 @@ int od_pvq_encode(daala_enc_ctx *enc,
   OD_UNUSED(bx);
   OD_UNUSED(by);
 #endif
+  /* TODO(yushin): Enable this for activity masking,
+     when pvq_qm_q4 is available in AOM. */
   /* pvq_qm = &enc->state.pvq_qm_q4[pli][0]; */
   exg = &enc->state.adapt.pvq.pvq_exg[pli][bs][0];
   ext = enc->state.adapt.pvq.pvq_ext + bs*PVQ_MAX_PARTITIONS;
@@ -846,6 +848,8 @@ int od_pvq_encode(daala_enc_ctx *enc,
   }
   for (i = 0; i < nb_bands; i++) {
     int q;
+    /* TODO(yushin): Enable this for activity masking,
+       when pvq_qm_q4 is available in AOM. */
     /*q = OD_MAXI(1, q0*pvq_qm[od_qm_get_index(bs, i + 1)] >> 4);*/
     q = OD_MAXI(1, q_ac);
     qg[i] = pvq_theta(out + off[i], in + off[i], ref + off[i], size[i],

@@ -428,6 +428,7 @@ static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
   const int blk_size = 1 << (bs + 2);
   int eob = 0;
   int i;
+  // TODO(yushin) : To enable activity masking,
   // int use_activity_masking = dec->use_activity_masking;
   int use_activity_masking = 0;
 
@@ -445,7 +446,7 @@ static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
   if (lossless)
     pvq_dc_quant = 1;
   else {
-    // TODO: Enable this later, if pvq_qm_q4 is available in AOM.
+    // TODO(yushin): Enable this for activity masking, when pvq_qm_q4 is available in AOM.
     // pvq_dc_quant = OD_MAXI(1, quant*
     // dec->state.pvq_qm_q4[pli][od_qm_get_index(bs, 0)] >> 4);
     pvq_dc_quant = OD_MAXI(1, quant[0] >> quant_shift);
@@ -514,6 +515,9 @@ static void predict_and_reconstruct_intra_block(MACROBLOCKD *const xd,
     const SCAN_ORDER *scan_order = get_scan(tx_size, tx_type);
     const int eob = av1_decode_block_tokens(xd, plane, scan_order, col, row,
                                             tx_size, r, mbmi->segment_id);
+
+    inverse_transform_block_intra(xd, plane, tx_type, tx_size, dst,
+                                  pd->dst.stride, eob);
 #else
     // pvq_decode() for intra block runs here.
     // transform block size in pixels
@@ -566,10 +570,9 @@ static void predict_and_reconstruct_intra_block(MACROBLOCKD *const xd,
         for (j = 0; j < tx_blk_size; j++)
           for (i = 0; i < tx_blk_size; i++)
             dst[j * pd->dst.stride + i] = 0;
-#endif
-    inverse_transform_block_intra(xd, plane, tx_type, tx_size, dst,
-                                  pd->dst.stride, eob);
-#if CONFIG_PVQ
+
+        inverse_transform_block_intra(xd, plane, tx_type, tx_size, dst,
+                                      pd->dst.stride, eob);
       }
     }
 #endif
@@ -587,6 +590,10 @@ static int reconstruct_inter_block(MACROBLOCKD *const xd, aom_reader *r,
   const SCAN_ORDER *scan_order = get_scan(tx_size, tx_type);
   const int eob = av1_decode_block_tokens(xd, plane, scan_order, col, row,
                                           tx_size, r, mbmi->segment_id);
+
+  inverse_transform_block_inter(
+      xd, plane, tx_size, &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
+      pd->dst.stride, eob, block_idx);
 #else
   int ac_dc_coded;
   int eob = 0;
@@ -646,11 +653,10 @@ static int reconstruct_inter_block(MACROBLOCKD *const xd, aom_reader *r,
       for (j = 0; j < tx_blk_size; j++)
         for (i = 0; i < tx_blk_size; i++)
           dst[j * pd->dst.stride + i] = 0;
-#endif
-  inverse_transform_block_inter(
-      xd, plane, tx_size, &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
-      pd->dst.stride, eob, block_idx);
-#if CONFIG_PVQ
+
+      inverse_transform_block_inter(
+          xd, plane, tx_size, &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
+          pd->dst.stride, eob, block_idx);
     }
   }
 #endif

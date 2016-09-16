@@ -320,7 +320,8 @@ void od_pvq_decode(daala_dec_ctx *dec,
     noref[i] = 0;
     skip[i] = 1;
   }
-  /*TODO: Enable this later, if pvq_qm_q4 is available in AOM.*/
+  /* TODO(yushin): Enable this for activity masking,
+     when pvq_qm_q4 is available in AOM. */
   /*pvq_qm = &dec->state.pvq_qm_q4[pli][0];*/
   exg = &dec->state.adapt.pvq.pvq_exg[pli][bs][0];
   ext = dec->state.adapt.pvq.pvq_ext + bs*PVQ_MAX_PARTITIONS;
@@ -340,7 +341,8 @@ void od_pvq_decode(daala_dec_ctx *dec,
     cfl.allow_flip = pli != 0 && is_keyframe;
     for (i = 0; i < nb_bands; i++) {
       int q;
-      /*TODO: Enable this later, if pvq_qm_q4 is available in AOM.*/
+      /* TODO(yushin): Enable this for activity masking,
+         when pvq_qm_q4 is available in AOM. */
       /*q = OD_MAXI(1, q0*pvq_qm[od_qm_get_index(bs, i + 1)] >> 4);*/
       q = OD_MAXI(1, q0);
       pvq_decode_partition(dec->ec, q, size[i],

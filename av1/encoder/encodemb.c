@@ -1365,7 +1365,7 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
                           int speed, PVQ_INFO *pvq_info) {
   const int tx_blk_size = 1 << (tx_size + 2);
   int skip;
-  // TODO(yushin): Enable this later, if pvq_qm_q4 is available in AOM.
+  // TODO(yushin): Enable this later, when pvq_qm_q4 is available in AOM.
   // int pvq_dc_quant = OD_MAXI(1,
   //  quant * daala_enc->state.pvq_qm_q4[plane][od_qm_get_index(tx_size, 0)] >>
   //  4);
@@ -1410,7 +1410,9 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
       daala_enc, ref_int32, in_int32, out_int32,
       (int)quant[0] >> quant_shift,  // scale/quantizer
       (int)quant[1] >> quant_shift,  // scale/quantizer
-      plane, tx_size, OD_PVQ_BETA[0 /*use_activity_masking*/][plane][tx_size],
+      /* TODO(yushin): Instead of 0,
+         use daala_enc->use_activity_masking for activity masking. */
+      plane, tx_size, OD_PVQ_BETA[0][plane][tx_size],
       1,        // OD_ROBUST_STREAM
       0,        // is_keyframe,
       0, 0, 0,  // q_scaling, bx, by,

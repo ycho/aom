@@ -23,102 +23,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*These tables were generated using compute_basis.c. If OD_FILT_SIZE is
-   changed, they have to be regenerated.*/
-static const double MAG4[] = {
-  0.870774, 0.872037, 0.949493, 0.947936
-};
-static const double MAG8[] = {
-  0.936496, 0.892830, 0.938452, 0.970087,
-  0.974272, 0.967954, 0.974035, 0.990480
-};
-static const double MAG16[] = {
-  0.968807, 0.940969, 0.947977, 0.957741,
-  0.969762, 0.978644, 0.984885, 0.988009,
-  0.987424, 0.985569, 0.984215, 0.984462,
-  0.987205, 0.991415, 0.994985, 0.998237
-};
-static const double MAG32[] = {
-  0.985068, 0.970006, 0.969893, 0.973192,
-  0.973444, 0.975881, 0.979601, 0.981070,
-  0.984989, 0.987520, 0.988830, 0.990983,
-  0.992376, 0.992884, 0.993447, 0.993381,
-  0.993712, 0.994060, 0.993294, 0.992392,
-  0.991338, 0.992410, 0.992051, 0.993874,
-  0.993488, 0.994162, 0.995318, 0.995925,
-  0.997475, 0.999027, 0.998303, 1.001413,
-};
-static const double MAG64[] = {
-  0.992453, 0.984930, 0.985137, 0.985029,
-  0.985514, 0.985784, 0.986269, 0.986854,
-  0.989932, 0.987780, 0.988269, 0.989175,
-  0.989951, 0.990466, 0.991145, 0.991839,
-  0.990773, 0.993191, 0.993618, 0.994221,
-  0.994662, 0.995259, 0.995826, 0.995996,
-  0.999070, 0.996624, 0.996835, 0.996948,
-  0.997022, 0.996973, 0.996993, 0.996996,
-  0.996871, 0.996828, 0.996598, 0.996688,
-  0.996845, 0.996407, 0.996327, 0.996435,
-  0.999173, 0.996216, 0.995981, 0.996173,
-  0.996595, 0.996334, 0.996512, 0.996627,
-  0.994976, 0.997113, 0.997248, 0.997548,
-  0.997943, 0.998121, 0.998291, 0.998687,
-  1.001696, 0.999133, 0.999315, 0.999621,
-  0.999745, 0.999905, 0.999936, 1.000075
-};
-
-static const double MAG4_CHROMA_420[] = {
-  0.870774, 0.872037, 0.949493, 0.947936
-};
-static const double MAG8_CHROMA_420[] = {
-  0.936496, 0.892830, 0.938452, 0.970087,
-  0.974272, 0.967954, 0.974035, 0.990480
-};
-static const double MAG16_CHROMA_420[] = {
-  0.968807, 0.940969, 0.947977, 0.957741,
-  0.969762, 0.978644, 0.984885, 0.988009,
-  0.987424, 0.985569, 0.984215, 0.984462,
-  0.987205, 0.991415, 0.994985, 0.998237
-};
-static const double MAG32_CHROMA_420[] = {
-  0.985068, 0.970006, 0.969893, 0.973192,
-  0.973444, 0.975881, 0.979601, 0.981070,
-  0.984989, 0.987520, 0.988830, 0.990983,
-  0.992376, 0.992884, 0.993447, 0.993381,
-  0.993712, 0.994060, 0.993294, 0.992392,
-  0.991338, 0.992410, 0.992051, 0.993874,
-  0.993488, 0.994162, 0.995318, 0.995925,
-  0.997475, 0.999027, 0.998303, 1.001413
-};
-static const double MAG64_CHROMA_420[] = {
-  0.992453, 0.984930, 0.985137, 0.985029,
-  0.985514, 0.985784, 0.986269, 0.986854,
-  0.989932, 0.987780, 0.988269, 0.989175,
-  0.989951, 0.990466, 0.991145, 0.991839,
-  0.990773, 0.993191, 0.993618, 0.994221,
-  0.994662, 0.995259, 0.995826, 0.995996,
-  0.999070, 0.996624, 0.996835, 0.996948,
-  0.997022, 0.996973, 0.996993, 0.996996,
-  0.996871, 0.996828, 0.996598, 0.996688,
-  0.996845, 0.996407, 0.996327, 0.996435,
-  0.999173, 0.996216, 0.995981, 0.996173,
-  0.996595, 0.996334, 0.996512, 0.996627,
-  0.994976, 0.997113, 0.997248, 0.997548,
-  0.997943, 0.998121, 0.998291, 0.998687,
-  1.001696, 0.999133, 0.999315, 0.999621,
-  0.999745, 0.999905, 0.999936, 1.000075
-};
-
-const double *OD_BASIS_MAG[2][OD_NBSIZES + 1] = {
-  {
-    MAG4, MAG8, MAG16, MAG32, MAG64
-  },
-  {
-    MAG4_CHROMA_420, MAG8_CHROMA_420, MAG16_CHROMA_420, MAG32_CHROMA_420,
-    MAG64_CHROMA_420
-  }
-};
-
 /* Quantization matrices for 8x8. For other block sizes, we currently just do
    resampling. */
 /* Flat quantization, i.e. optimize for PSNR. */
@@ -296,11 +200,7 @@ int od_qm_offset(int bs, int xydec)
     return xydec*OD_QM_STRIDE + OD_QM_OFFSET(bs);
 }
 
-/* Initialize the quantization matrix with the magnitude compensation applied.
-   We need to compensate for the magnitude because lapping causes some basis
-   functions to be smaller, so they would end up being quantized too finely
-   (the same error in the quantized domain would result in a smaller pixel
-   domain error). */
+/* Initialize the quantization matrix. */
 // Note: When varying scan orders for hybrid transform is used by PVQ,
 // since AOM does not use magnitude compensation (i.e. simplay x16 for all coeffs),
 // we don't need seperate qm and qm_inv for each transform type.
@@ -322,11 +222,7 @@ void od_init_qm(int16_t *x, int16_t *x_inv, const int *qm) {
       for (i = 0; i < 4 << bs; i++) {
         for (j = 0; j < 4 << bs; j++) {
           double mag;
-#if OD_DEBLOCKING || OD_DISABLE_FILTER
           mag = 1.0;
-#else
-          mag = OD_BASIS_MAG[xydec][bs][i]*OD_BASIS_MAG[xydec][bs][j];
-#endif
           if (i == 0 && j == 0) {
             mag = 1.0;
           }

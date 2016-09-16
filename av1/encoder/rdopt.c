@@ -328,6 +328,14 @@ static void model_rd_for_sb(const AV1_COMP *const cpi, BLOCK_SIZE bsize,
 }
 
 #if CONFIG_PVQ
+// Without PVQ, av1_block_error_c() return two kind of errors,
+// 1) reconstruction (i.e. decoded) error and
+// 2) Squared sum of transformed residue (i.e. 'coeff')
+// However, if PVQ is enabled, coeff does not keep the transformed residue
+// but instead a transformed original is kept.
+// Hence, new parameter ref vector (i.e. transformed predicted signal)
+// is required to derive the residue signal,
+// i.e. coeff - ref = residue (all transformed).
 int64_t av1_block_error2_c(const tran_low_t *coeff, const tran_low_t *dqcoeff,
                            const tran_low_t *ref, intptr_t block_size,
                            int64_t *ssz) {
