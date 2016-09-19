@@ -38,7 +38,7 @@ extern "C" {
 /*Smallest blocks are 4x4*/
 #define OD_LOG_BSIZE0 (2)
 /*There are 5 block sizes total (4x4, 8x8, 16x16, 32x32 and 64x64).*/
-#define OD_NBSIZES (5)
+#define OD_NBSIZES (4)
 /*The log of the maximum length of the side of a block.*/
 #define OD_LOG_BSIZE_MAX (OD_LOG_BSIZE0 + OD_NBSIZES - 1)
 /*The maximum length of the side of a block.*/
@@ -62,11 +62,10 @@ extern "C" {
 #define OD_BLOCK_8X8 (1)
 #define OD_BLOCK_16X16 (2)
 #define OD_BLOCK_32X32 (3)
-#define OD_BLOCK_64X64 (4)
-#define OD_BLOCK_SIZES (OD_BLOCK_64X64 + 1)
+#define OD_BLOCK_SIZES (OD_BLOCK_32X32 + 1)
 
 # define OD_LIMIT_BSIZE_MIN (OD_BLOCK_4X4)
-# define OD_LIMIT_BSIZE_MAX (OD_BLOCK_64X64)
+# define OD_LIMIT_BSIZE_MAX (OD_BLOCK_32X32)
 
 typedef int od_coeff;
 

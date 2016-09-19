@@ -30,7 +30,4 @@ extern const unsigned char OD_ZIGZAG16_DCT_ADST[192][2];
 extern const unsigned char OD_ZIGZAG16_ADST_ADST[192][2];
 
 extern const unsigned char OD_ZIGZAG32_DCT_DCT[768][2];
-
-extern const unsigned char OD_ZIGZAG64_DCT_DCT[3072][2];
-
 #endif

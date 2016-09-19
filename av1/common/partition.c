@@ -48,22 +48,8 @@ OD_EXTERN const index_pair *OD_ZIGZAG32[4] = {
   OD_ZIGZAG32_DCT_DCT
 };
 
-OD_EXTERN const index_pair *OD_ZIGZAG64[4] = {
-  OD_ZIGZAG64_DCT_DCT,
-  OD_ZIGZAG64_DCT_DCT,
-  OD_ZIGZAG64_DCT_DCT,
-  OD_ZIGZAG64_DCT_DCT
-};
-
 /* The tables below specify how coefficient blocks are translated to
    and from PVQ partition coding scan order for 4x4, 8x8 and 16x16 */
-static const int OD_LAYOUT64_OFFSETS[4] = { 0, 512, 1024, 3072 };
-const band_layout OD_LAYOUT64 = {
-  OD_ZIGZAG64,
-  64,
-  3,
-  OD_LAYOUT64_OFFSETS
-};
 
 static const int OD_LAYOUT32_OFFSETS[4] = { 0, 128, 256, 768 };
 const band_layout OD_LAYOUT32 = {
@@ -152,7 +138,7 @@ static void od_raster_from_band(const band_layout *layout, int16_t *dst,
 }
 
 static const band_layout *const OD_LAYOUTS[] = {&OD_LAYOUT4, &OD_LAYOUT8,
- &OD_LAYOUT16, &OD_LAYOUT32, &OD_LAYOUT64};
+ &OD_LAYOUT16, &OD_LAYOUT32};
 
 /** Converts a coefficient block in raster order into a vector in
  * coding scan order with the PVQ partitions laid out one after

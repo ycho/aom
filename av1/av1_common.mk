@@ -104,7 +104,6 @@ AV1_COMMON_SRCS-yes += common/zigzag4.c
 AV1_COMMON_SRCS-yes += common/zigzag8.c
 AV1_COMMON_SRCS-yes += common/zigzag16.c
 AV1_COMMON_SRCS-yes += common/zigzag32.c
-AV1_COMMON_SRCS-yes += common/zigzag64.c
 AV1_COMMON_SRCS-yes += common/zigzag.h
 AV1_COMMON_SRCS-yes += common/generic_code.c
 AV1_COMMON_SRCS-yes += common/generic_code.h
