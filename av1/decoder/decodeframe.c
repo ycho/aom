@@ -416,9 +416,9 @@ static void inverse_transform_block_intra(MACROBLOCKD *xd, int plane,
 
 #if CONFIG_PVQ
 static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
-                                 int16_t *dqcoeff, int16_t *quant,
-                                 int pli, int bs,
-                                 TX_TYPE tx_type, int xdec, int ac_dc_coded) {
+                                 int16_t *dqcoeff, int16_t *quant, int pli,
+                                 int bs, TX_TYPE tx_type, int xdec,
+                                 int ac_dc_coded) {
   unsigned int flags;  // used for daala's stream analyzer.
   int off;
   const int is_keyframe = 0;
@@ -570,8 +570,7 @@ static void predict_and_reconstruct_intra_block(MACROBLOCKD *const xd,
       // pass blank dummy image to av1_inv_txfm_add_*x*(), i.e. set dst as zeros
       if (eob > 0) {
         for (j = 0; j < tx_blk_size; j++)
-          for (i = 0; i < tx_blk_size; i++)
-            dst[j * pd->dst.stride + i] = 0;
+          for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
 
         inverse_transform_block_intra(xd, plane, tx_type, tx_size, dst,
                                       pd->dst.stride, eob);
@@ -653,8 +652,7 @@ static int reconstruct_inter_block(MACROBLOCKD *const xd, aom_reader *r,
     // zeros
     if (eob > 0) {
       for (j = 0; j < tx_blk_size; j++)
-        for (i = 0; i < tx_blk_size; i++)
-          dst[j * pd->dst.stride + i] = 0;
+        for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
 
       inverse_transform_block_inter(
           xd, plane, tx_size, &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],

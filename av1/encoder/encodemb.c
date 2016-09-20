@@ -957,8 +957,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   // inverse transformed image,
   // pass blank dummy image to av1_inv_txfm_add_*x*(), i.e. set dst as zeros
   for (j = 0; j < tx_blk_size; j++)
-    for (i = 0; i < tx_blk_size; i++)
-      dst[j * pd->dst.stride + i] = 0;
+    for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
 #endif
 
 #if CONFIG_AOM_HIGHBITDEPTH
@@ -1313,8 +1312,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
 
   if (!skip) {
     for (j = 0; j < tx_blk_size; j++)
-      for (i = 0; i < tx_blk_size; i++)
-        dst[j * dst_stride + i] = 0;
+      for (i = 0; i < tx_blk_size; i++) dst[j * dst_stride + i] = 0;
 
     switch (tx_size) {
       case TX_32X32:
@@ -1357,8 +1355,8 @@ void av1_encode_intra_block_plane(MACROBLOCK *x, BLOCK_SIZE bsize, int plane) {
 int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
                           tran_low_t *ref_coeff, tran_low_t *const dqcoeff,
                           uint16_t *eob, const int16_t *quant, int plane,
-                          int tx_size, TX_TYPE tx_type, int *rate,
-                          int speed, PVQ_INFO *pvq_info) {
+                          int tx_size, TX_TYPE tx_type, int *rate, int speed,
+                          PVQ_INFO *pvq_info) {
   const int tx_blk_size = 1 << (tx_size + 2);
   int skip;
   // TODO(yushin): Enable this later, when pvq_qm_q4 is available in AOM.
@@ -1459,9 +1457,9 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
 }
 
 void av1_store_pvq_enc_info(PVQ_INFO *pvq_info, int *qg, int *theta,
-                            int *max_theta,
-                            int *k, od_coeff *y, int nb_bands, const int *off,
-                            int *size, int skip_rest, int skip_dir,
+                            int *max_theta, int *k, od_coeff *y, int nb_bands,
+                            const int *off, int *size, int skip_rest,
+                            int skip_dir,
                             int bs) {  // block size in log_2 -2
   int i;
   const int tx_blk_size = 1 << (bs + 2);

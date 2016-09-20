@@ -1889,7 +1889,7 @@ static void rd_use_partition(AV1_COMP *cpi, ThreadData *td,
 #if !CONFIG_PVQ
       restore_context(x, mi_row, mi_col, a2, l2, sa2, sl2, bsize);
 #else
-      restore_context(x, mi_row, mi_col, a2, l2, sa2, sl2,  &buf, bsize);
+      restore_context(x, mi_row, mi_col, a2, l2, sa2, sl2, &buf, bsize);
 #endif
       if (tmp_rdc.rate == INT_MAX || tmp_rdc.dist == INT64_MAX) {
         av1_rd_cost_reset(&chosen_rdc);

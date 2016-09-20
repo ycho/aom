@@ -519,12 +519,13 @@ static void dist_block(MACROBLOCK *x, int plane, int block, TX_SIZE tx_size,
 #endif
 #if CONFIG_AOM_HIGHBITDEPTH
   const int bd = (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) ? xd->bd : 8;
-    *out_dist =
-        av1_highbd_block_error(coeff, dqcoeff, ss_txfrm_size, &this_sse, bd) >>
-        shift;
+  *out_dist =
+      av1_highbd_block_error(coeff, dqcoeff, ss_txfrm_size, &this_sse, bd) >>
+      shift;
 #elif CONFIG_PVQ
-  *out_dist = av1_block_error2_c(coeff, dqcoeff, ref_coeff, ss_txfrm_size,
-                                 &this_sse) >> shift;
+  *out_dist =
+      av1_block_error2_c(coeff, dqcoeff, ref_coeff, ss_txfrm_size, &this_sse) >>
+      shift;
 #else
   *out_dist =
       av1_block_error(coeff, dqcoeff, ss_txfrm_size, &this_sse) >> shift;
@@ -1297,8 +1298,7 @@ static int64_t rd_pick_intra4x4block(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_PVQ
           if (!skip) {
             for (j = 0; j < tx_blk_size; j++)
-              for (i = 0; i < tx_blk_size; i++)
-                dst[j * dst_stride + i] = 0;
+              for (i = 0; i < tx_blk_size; i++) dst[j * dst_stride + i] = 0;
 #endif
             av1_inv_txfm_add_4x4(BLOCK_OFFSET(pd->dqcoeff, block), dst,
                                  dst_stride, p->eobs[block], DCT_DCT, 1);
@@ -1331,8 +1331,7 @@ static int64_t rd_pick_intra4x4block(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_PVQ
           if (!skip) {
             for (j = 0; j < tx_blk_size; j++)
-              for (i = 0; i < tx_blk_size; i++)
-                dst[j * dst_stride + i] = 0;
+              for (i = 0; i < tx_blk_size; i++) dst[j * dst_stride + i] = 0;
 #endif
             av1_inv_txfm_add_4x4(BLOCK_OFFSET(pd->dqcoeff, block), dst,
                                  dst_stride, p->eobs[block], tx_type, 0);
@@ -2406,10 +2405,11 @@ static int set_and_cost_bmi_mvs(const AV1_COMP *const cpi, MACROBLOCK *x,
 }
 
 static int64_t encode_inter_mb_segment(const AV1_COMP *const cpi, MACROBLOCK *x,
-                                       int64_t best_yrd, int block, int *labelyrate,
-                                       int64_t *distortion, int64_t *sse,
-                                       ENTROPY_CONTEXT *ta, ENTROPY_CONTEXT *tl,
-                                       int ir, int ic, int mi_row, int mi_col) {
+                                       int64_t best_yrd, int block,
+                                       int *labelyrate, int64_t *distortion,
+                                       int64_t *sse, ENTROPY_CONTEXT *ta,
+                                       ENTROPY_CONTEXT *tl, int ir, int ic,
+                                       int mi_row, int mi_col) {
   int k;
   MACROBLOCKD *xd = &x->e_mbd;
   struct macroblockd_plane *const pd = &xd->plane[0];
@@ -2452,16 +2452,17 @@ static int64_t encode_inter_mb_segment(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_AOM_HIGHBITDEPTH
   if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
     aom_highbd_subtract_block(
-        height, width, av1_raster_block_offset_int16(BLOCK_8X8, block, p->src_diff),
-        8, src, p->src.stride, dst, pd->dst.stride, xd->bd);
+        height, width,
+        av1_raster_block_offset_int16(BLOCK_8X8, block, p->src_diff), 8, src,
+        p->src.stride, dst, pd->dst.stride, xd->bd);
   } else {
-    aom_subtract_block(height, width,
-                       av1_raster_block_offset_int16(BLOCK_8X8, block, p->src_diff),
+    aom_subtract_block(height, width, av1_raster_block_offset_int16(
+                                          BLOCK_8X8, block, p->src_diff),
                        8, src, p->src.stride, dst, pd->dst.stride);
   }
 #else
-  aom_subtract_block(height, width,
-                     av1_raster_block_offset_int16(BLOCK_8X8, block, p->src_diff),
+  aom_subtract_block(height, width, av1_raster_block_offset_int16(
+                                        BLOCK_8X8, block, p->src_diff),
                      8, src, p->src.stride, dst, pd->dst.stride);
 #endif  // CONFIG_AOM_HIGHBITDEPTH
 #endif  // !CONFIG_PVQ
@@ -2508,9 +2509,9 @@ static int64_t encode_inter_mb_segment(const AV1_COMP *const cpi, MACROBLOCK *x,
       fwd_txm4x4(src_int16, coeff, diff_stride);
       fwd_txm4x4(pred, ref_coeff, diff_stride);
 
-      av1_pvq_encode_helper(&x->daala_enc, coeff, ref_coeff, dqcoeff, &p->eobs[k],
-                            pd->dequant, 0, TX_4X4, tx_type, &rate_pvq,
-                            x->pvq_speed, NULL);
+      av1_pvq_encode_helper(&x->daala_enc, coeff, ref_coeff, dqcoeff,
+                            &p->eobs[k], pd->dequant, 0, TX_4X4, tx_type,
+                            &rate_pvq, x->pvq_speed, NULL);
 #endif
 
 #if CONFIG_AOM_HIGHBITDEPTH
