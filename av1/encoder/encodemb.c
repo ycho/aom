@@ -38,6 +38,7 @@ struct optimize_ctx {
   ENTROPY_CONTEXT tl[MAX_MB_PLANE][16];
 };
 
+#if !CONFIG_PVQ
 void av1_subtract_plane(MACROBLOCK *x, BLOCK_SIZE bsize, int plane) {
   struct macroblock_plane *const p = &x->plane[plane];
   const struct macroblockd_plane *const pd = &x->e_mbd.plane[plane];
@@ -56,6 +57,7 @@ void av1_subtract_plane(MACROBLOCK *x, BLOCK_SIZE bsize, int plane) {
   aom_subtract_block(bh, bw, p->src_diff, bw, p->src.buf, p->src.stride,
                      pd->dst.buf, pd->dst.stride);
 }
+#endif
 
 #define RDTRUNC(RM, DM, R, D)                        \
   (((1 << (AV1_PROB_COST_SHIFT - 1)) + (R) * (RM)) & \
@@ -1048,7 +1050,9 @@ static void encode_block_pass1(int plane, int block, int blk_row, int blk_col,
 }
 
 void av1_encode_sby_pass1(MACROBLOCK *x, BLOCK_SIZE bsize) {
+#if !CONFIG_PVQ
   av1_subtract_plane(x, bsize, 0);
+#endif
   av1_foreach_transformed_block_in_plane(&x->e_mbd, bsize, 0,
                                          encode_block_pass1, x);
 }
