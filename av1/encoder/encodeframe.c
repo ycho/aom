@@ -1445,6 +1445,9 @@ static void restore_context(MACROBLOCK *const x, int mi_row, int mi_col,
                             ENTROPY_CONTEXT a[16 * MAX_MB_PLANE],
                             ENTROPY_CONTEXT l[16 * MAX_MB_PLANE],
                             PARTITION_CONTEXT sa[8], PARTITION_CONTEXT sl[8],
+#if CONFIG_PVQ
+                            od_rollback_buffer *rdo_buf,
+#endif
                             BLOCK_SIZE bsize) {
   MACROBLOCKD *const xd = &x->e_mbd;
   int p;
@@ -1467,12 +1470,18 @@ static void restore_context(MACROBLOCK *const x, int mi_row, int mi_col,
          sizeof(*xd->above_seg_context) * mi_width);
   memcpy(xd->left_seg_context + (mi_row & MAX_MIB_MASK), sl,
          sizeof(xd->left_seg_context[0]) * mi_height);
+#if CONFIG_PVQ
+  od_encode_rollback(&x->daala_enc, rdo_buf);
+#endif
 }
 
 static void save_context(MACROBLOCK *const x, int mi_row, int mi_col,
                          ENTROPY_CONTEXT a[16 * MAX_MB_PLANE],
                          ENTROPY_CONTEXT l[16 * MAX_MB_PLANE],
                          PARTITION_CONTEXT sa[8], PARTITION_CONTEXT sl[8],
+#if CONFIG_PVQ
+                         od_rollback_buffer *rdo_buf,
+#endif
                          BLOCK_SIZE bsize) {
   const MACROBLOCKD *const xd = &x->e_mbd;
   int p;
@@ -1497,6 +1506,9 @@ static void save_context(MACROBLOCK *const x, int mi_row, int mi_col,
          sizeof(*xd->above_seg_context) * mi_width);
   memcpy(sl, xd->left_seg_context + (mi_row & MAX_MIB_MASK),
          sizeof(xd->left_seg_context[0]) * mi_height);
+#if CONFIG_PVQ
+  od_encode_checkpoint(&x->daala_enc, rdo_buf);
+#endif
 }
 
 static void encode_b(const AV1_COMP *const cpi, const TileInfo *const tile,
@@ -1692,10 +1704,12 @@ static void rd_use_partition(AV1_COMP *cpi, ThreadData *td,
   subsize = get_subsize(bsize, partition);
 
   pc_tree->partitioning = partition;
+#if !CONFIG_PVQ
   save_context(x, mi_row, mi_col, a, l, sa, sl, bsize);
-#if CONFIG_PVQ
-  od_encode_checkpoint(&x->daala_enc, &pre_rdo_buf);
+#else
+  save_context(x, mi_row, mi_col, a, l, sa, sl, &pre_rdo_buf, bsize);
 #endif
+
   if (bsize == BLOCK_16X16 && cpi->oxcf.aq_mode) {
     set_offsets(cpi, tile_info, x, mi_row, mi_col, bsize);
     x->mb_energy = av1_block_energy(cpi, x, bsize);
@@ -1734,9 +1748,10 @@ static void rd_use_partition(AV1_COMP *cpi, ThreadData *td,
             RDCOST(x->rdmult, x->rddiv, none_rdc.rate, none_rdc.dist);
       }
 
+#if !CONFIG_PVQ
       restore_context(x, mi_row, mi_col, a, l, sa, sl, bsize);
-#if CONFIG_PVQ
-      od_encode_rollback(&x->daala_enc, &pre_rdo_buf);
+#else
+      restore_context(x, mi_row, mi_col, a, l, sa, sl, &pre_rdo_buf, bsize);
 #endif
       mi_8x8[0]->mbmi.sb_type = bs_type;
       pc_tree->partitioning = partition;
@@ -1841,9 +1856,10 @@ static void rd_use_partition(AV1_COMP *cpi, ThreadData *td,
     BLOCK_SIZE split_subsize = get_subsize(bsize, PARTITION_SPLIT);
     chosen_rdc.rate = 0;
     chosen_rdc.dist = 0;
+#if !CONFIG_PVQ
     restore_context(x, mi_row, mi_col, a, l, sa, sl, bsize);
-#if CONFIG_PVQ
-    od_encode_rollback(&x->daala_enc, &pre_rdo_buf);
+#else
+    restore_context(x, mi_row, mi_col, a, l, sa, sl, &pre_rdo_buf, bsize);
 #endif
     pc_tree->partitioning = PARTITION_SPLIT;
 
@@ -1860,18 +1876,20 @@ static void rd_use_partition(AV1_COMP *cpi, ThreadData *td,
       if ((mi_row + y_idx >= cm->mi_rows) || (mi_col + x_idx >= cm->mi_cols))
         continue;
 
+#if !CONFIG_PVQ
       save_context(x, mi_row, mi_col, a2, l2, sa2, sl2, bsize);
-#if CONFIG_PVQ
-      od_encode_checkpoint(&x->daala_enc, &buf);
+#else
+      save_context(x, mi_row, mi_col, a2, l2, sa2, sl2, &buf, bsize);
 #endif
       pc_tree->split[i]->partitioning = PARTITION_NONE;
       rd_pick_sb_modes(cpi, tile_data, x, mi_row + y_idx, mi_col + x_idx,
                        &tmp_rdc, split_subsize, &pc_tree->split[i]->none,
                        INT64_MAX);
 
+#if !CONFIG_PVQ
       restore_context(x, mi_row, mi_col, a2, l2, sa2, sl2, bsize);
-#if CONFIG_PVQ
-      od_encode_rollback(&x->daala_enc, &buf);
+#else
+      restore_context(x, mi_row, mi_col, a2, l2, sa2, sl2,  &buf, bsize);
 #endif
       if (tmp_rdc.rate == INT_MAX || tmp_rdc.dist == INT64_MAX) {
         av1_rd_cost_reset(&chosen_rdc);
@@ -1910,10 +1928,10 @@ static void rd_use_partition(AV1_COMP *cpi, ThreadData *td,
     chosen_rdc = none_rdc;
   }
 
+#if !CONFIG_PVQ
   restore_context(x, mi_row, mi_col, a, l, sa, sl, bsize);
-#if CONFIG_PVQ
-  // if partitioning rdo is done, rollback to pre rdo state.
-  od_encode_rollback(&x->daala_enc, &pre_rdo_buf);
+#else
+  restore_context(x, mi_row, mi_col, a, l, sa, sl, &pre_rdo_buf, bsize);
 #endif
 
   // We must have chosen a partitioning and encoding or we'll fail later on.
@@ -2251,10 +2269,10 @@ static void rd_pick_partition(const AV1_COMP *const cpi, ThreadData *td,
     partition_horz_allowed &= force_horz_split;
     partition_vert_allowed &= force_vert_split;
   }
-
+#if !CONFIG_PVQ
   save_context(x, mi_row, mi_col, a, l, sa, sl, bsize);
-#if CONFIG_PVQ
-  od_encode_checkpoint(&x->daala_enc, &pre_rdo_buf);
+#else
+  save_context(x, mi_row, mi_col, a, l, sa, sl, &pre_rdo_buf, bsize);
 #endif
 
 #if CONFIG_FP_MB_STATS
@@ -2400,9 +2418,10 @@ static void rd_pick_partition(const AV1_COMP *const cpi, ThreadData *td,
 #endif
       }
     }
+#if !CONFIG_PVQ
     restore_context(x, mi_row, mi_col, a, l, sa, sl, bsize);
-#if CONFIG_PVQ
-    od_encode_rollback(&x->daala_enc, &pre_rdo_buf);
+#else
+    restore_context(x, mi_row, mi_col, a, l, sa, sl, &pre_rdo_buf, bsize);
 #endif
   }
 
@@ -2466,9 +2485,10 @@ static void rd_pick_partition(const AV1_COMP *const cpi, ThreadData *td,
       // gives better rd cost
       do_rectangular_split &= !partition_none_allowed;
     }
+#if !CONFIG_PVQ
     restore_context(x, mi_row, mi_col, a, l, sa, sl, bsize);
-#if CONFIG_PVQ
-    od_encode_rollback(&x->daala_enc, &pre_rdo_buf);
+#else
+    restore_context(x, mi_row, mi_col, a, l, sa, sl, &pre_rdo_buf, bsize);
 #endif
   }
 
@@ -2517,9 +2537,10 @@ static void rd_pick_partition(const AV1_COMP *const cpi, ThreadData *td,
         pc_tree->partitioning = PARTITION_HORZ;
       }
     }
+#if !CONFIG_PVQ
     restore_context(x, mi_row, mi_col, a, l, sa, sl, bsize);
-#if CONFIG_PVQ
-    od_encode_rollback(&x->daala_enc, &pre_rdo_buf);
+#else
+    restore_context(x, mi_row, mi_col, a, l, sa, sl, &pre_rdo_buf, bsize);
 #endif
   }
 
@@ -2568,9 +2589,10 @@ static void rd_pick_partition(const AV1_COMP *const cpi, ThreadData *td,
         pc_tree->partitioning = PARTITION_VERT;
       }
     }
+#if !CONFIG_PVQ
     restore_context(x, mi_row, mi_col, a, l, sa, sl, bsize);
-#if CONFIG_PVQ
-    od_encode_rollback(&x->daala_enc, &pre_rdo_buf);
+#else
+    restore_context(x, mi_row, mi_col, a, l, sa, sl, &pre_rdo_buf, bsize);
 #endif
   }
 
@@ -2874,7 +2896,6 @@ void av1_encode_tile(AV1_COMP *cpi, ThreadData *td, int tile_row,
         (double)rdmult * (64 / 16) / (q_dc * q_dc * (1 << RDDIV_BITS));
     // printf("%f\n", td->mb.daala_enc.pvq_norm_lambda);
   }
-
   od_init_qm(td->mb.daala_enc.state.qm, td->mb.daala_enc.state.qm_inv,
              td->mb.daala_enc.qm == OD_HVS_QM ? OD_QM8_Q4_HVS : OD_QM8_Q4_FLAT);
   od_ec_enc_init(&td->mb.daala_enc.ec, 65025);
