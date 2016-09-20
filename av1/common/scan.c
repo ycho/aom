@@ -691,6 +691,10 @@ DECLARE_ALIGNED(16, static const int16_t, av1_default_iscan_32x32[1024]) = {
 };
 
 const SCAN_ORDER av1_default_scan_orders[TX_SIZES] = {
+#if CONFIG_CB4X4
+  // TODO(jingning): use 2x2 scan order
+  { default_scan_4x4, av1_default_iscan_4x4, default_scan_4x4_neighbors },
+#endif
   { default_scan_4x4, av1_default_iscan_4x4, default_scan_4x4_neighbors },
   { default_scan_8x8, av1_default_iscan_8x8, default_scan_8x8_neighbors },
   { default_scan_16x16, av1_default_iscan_16x16, default_scan_16x16_neighbors },
@@ -698,6 +702,13 @@ const SCAN_ORDER av1_default_scan_orders[TX_SIZES] = {
 };
 
 const SCAN_ORDER av1_scan_orders[TX_SIZES][TX_TYPES] = {
+#if CONFIG_CB4X4
+  { // TX_2X2
+    { default_scan_4x4, av1_default_iscan_4x4, default_scan_4x4_neighbors },
+    { row_scan_4x4, av1_row_iscan_4x4, row_scan_4x4_neighbors },
+    { col_scan_4x4, av1_col_iscan_4x4, col_scan_4x4_neighbors },
+    { default_scan_4x4, av1_default_iscan_4x4, default_scan_4x4_neighbors } },
+#endif
   { // TX_4X4
     { default_scan_4x4, av1_default_iscan_4x4, default_scan_4x4_neighbors },
     { row_scan_4x4, av1_row_iscan_4x4, row_scan_4x4_neighbors },
@@ -725,3 +736,76 @@ const SCAN_ORDER av1_scan_orders[TX_SIZES][TX_TYPES] = {
     { default_scan_32x32, av1_default_iscan_32x32,
       default_scan_32x32_neighbors } },
 };
+
+#if CONFIG_ADAPT_SCAN
+int get_tx1d_size(TX_SIZE tx_size) { return 1 << (tx_size + 2); }
+
+int get_tx2d_size(TX_SIZE tx_size) { return 1 << ((tx_size + 2) * 2); }
+
+uint32_t *get_non_zero_prob(FRAME_CONTEXT *fc, TX_SIZE tx_size,
+                            TX_TYPE tx_type) {
+  switch (tx_size) {
+    case TX_4X4: return fc->non_zero_prob_4X4[tx_type];
+    case TX_8X8: return fc->non_zero_prob_8X8[tx_type];
+    case TX_16X16: return fc->non_zero_prob_16X16[tx_type];
+    case TX_32X32: return fc->non_zero_prob_32X32[tx_type];
+    default: assert(0); return NULL;
+  }
+}
+
+int16_t *get_adapt_scan(FRAME_CONTEXT *fc, TX_SIZE tx_size, TX_TYPE tx_type) {
+  switch (tx_size) {
+    case TX_4X4: return fc->scan_4X4[tx_type];
+    case TX_8X8: return fc->scan_8X8[tx_type];
+    case TX_16X16: return fc->scan_16X16[tx_type];
+    case TX_32X32: return fc->scan_32X32[tx_type];
+    default: assert(0); return NULL;
+  }
+}
+
+uint32_t *get_non_zero_counts(FRAME_COUNTS *counts, TX_SIZE tx_size,
+                              TX_TYPE tx_type) {
+  switch (tx_size) {
+    case TX_4X4: return counts->non_zero_count_4X4[tx_type];
+    case TX_8X8: return counts->non_zero_count_8X8[tx_type];
+    case TX_16X16: return counts->non_zero_count_16X16[tx_type];
+    case TX_32X32: return counts->non_zero_count_32X32[tx_type];
+    default: assert(0); return NULL;
+  }
+}
+
+void update_scan_prob(AV1_COMMON *cm, TX_SIZE tx_size, TX_TYPE tx_type,
+                      int rate_16) {
+  FRAME_CONTEXT *pre_fc = &cm->frame_contexts[cm->frame_context_idx];
+  uint32_t *prev_non_zero_prob = get_non_zero_prob(pre_fc, tx_size, tx_type);
+  uint32_t *non_zero_prob = get_non_zero_prob(cm->fc, tx_size, tx_type);
+  uint32_t *non_zero_count = get_non_zero_counts(&cm->counts, tx_size, tx_type);
+  int tx2d_size = get_tx2d_size(tx_size);
+  unsigned int block_num = cm->counts.txb_count[tx_size][tx_type];
+  int i;
+  for (i = 0; i < tx2d_size; i++) {
+    int64_t curr_prob =
+        block_num == 0 ? 0 : (non_zero_count[i] << 16) / block_num;
+    int64_t prev_prob = prev_non_zero_prob[i];
+    int64_t pred_prob =
+        (curr_prob * rate_16 + prev_prob * ((1 << 16) - rate_16)) >> 16;
+    non_zero_prob[i] = clamp(pred_prob, 0, UINT16_MAX);
+  }
+}
+
+void update_scan_count(int16_t *scan, int max_scan, tran_low_t *dqcoeffs,
+                       uint32_t *non_zero_count) {
+  int i;
+  for (i = 0; i < max_scan; ++i) {
+    int coeff_idx = scan[i];
+    non_zero_count[coeff_idx] += (dqcoeffs[coeff_idx] != 0);
+  }
+}
+
+void update_scan_count_facade(AV1_COMMON *cm, TX_SIZE tx_size, TX_TYPE tx_type,
+                              tran_low_t *dqcoeffs, int max_scan) {
+  int16_t *scan = get_adapt_scan(cm->fc, tx_size, tx_type);
+  uint32_t *non_zero_count = get_non_zero_counts(&cm->counts, tx_size, tx_type);
+  update_scan_count(scan, max_scan, dqcoeffs, non_zero_count);
+}
+#endif

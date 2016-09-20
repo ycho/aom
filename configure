@@ -272,6 +272,7 @@ EXPERIMENT_LIST="
     frame_size
     filter_7bit
     delta_q
+    adapt_scan
 "
 CONFIG_LIST="
     dependency_tracking

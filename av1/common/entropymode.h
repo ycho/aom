@@ -65,9 +65,21 @@ typedef struct frame_contexts {
 #if CONFIG_RANS || CONFIG_DAALA_EC
   coeff_cdf_model coef_cdfs[TX_SIZES][PLANE_TYPES];
 #endif  // CONFIG_RANS
-  aom_prob
-      switchable_interp_prob[SWITCHABLE_FILTER_CONTEXTS][SWITCHABLE_FILTERS -
-                                                         1];
+  aom_prob switchable_interp_prob[SWITCHABLE_FILTER_CONTEXTS]
+                                 [SWITCHABLE_FILTERS - 1];
+
+#if CONFIG_ADAPT_SCAN
+  // TODO(angiebird): try aom_prob
+  uint32_t non_zero_prob_4X4[TX_TYPES][16];
+  uint32_t non_zero_prob_8X8[TX_TYPES][64];
+  uint32_t non_zero_prob_16X16[TX_TYPES][256];
+  uint32_t non_zero_prob_32X32[TX_TYPES][1024];
+
+  int16_t scan_4X4[TX_TYPES][16];
+  int16_t scan_8X8[TX_TYPES][64];
+  int16_t scan_16X16[TX_TYPES][256];
+  int16_t scan_32X32[TX_TYPES][1024];
+#endif
 
 #if CONFIG_REF_MV
   aom_prob newmv_prob[NEWMV_MODE_CONTEXTS];
@@ -106,8 +118,8 @@ typedef struct frame_contexts {
   aom_cdf_prob y_mode_cdf[BLOCK_SIZE_GROUPS][INTRA_MODES];
   aom_cdf_prob uv_mode_cdf[INTRA_MODES][INTRA_MODES];
   aom_cdf_prob partition_cdf[PARTITION_CONTEXTS][PARTITION_TYPES];
-  aom_cdf_prob
-      switchable_interp_cdf[SWITCHABLE_FILTER_CONTEXTS][SWITCHABLE_FILTERS];
+  aom_cdf_prob switchable_interp_cdf[SWITCHABLE_FILTER_CONTEXTS]
+                                    [SWITCHABLE_FILTERS];
   aom_cdf_prob inter_mode_cdf[INTER_MODE_CONTEXTS][INTER_MODES];
   aom_cdf_prob intra_ext_tx_cdf[EXT_TX_SIZES][TX_TYPES][TX_TYPES];
   aom_cdf_prob inter_ext_tx_cdf[EXT_TX_SIZES][TX_TYPES];
@@ -123,10 +135,18 @@ typedef struct FRAME_COUNTS {
   unsigned int uv_mode[INTRA_MODES][INTRA_MODES];
   unsigned int partition[PARTITION_CONTEXTS][PARTITION_TYPES];
   av1_coeff_count_model coef[TX_SIZES][PLANE_TYPES];
-  unsigned int
-      eob_branch[TX_SIZES][PLANE_TYPES][REF_TYPES][COEF_BANDS][COEFF_CONTEXTS];
-  unsigned int
-      switchable_interp[SWITCHABLE_FILTER_CONTEXTS][SWITCHABLE_FILTERS];
+  unsigned int eob_branch[TX_SIZES][PLANE_TYPES][REF_TYPES][COEF_BANDS]
+                         [COEFF_CONTEXTS];
+  unsigned int switchable_interp[SWITCHABLE_FILTER_CONTEXTS]
+                                [SWITCHABLE_FILTERS];
+
+#if CONFIG_ADAPT_SCAN
+  unsigned int non_zero_count_4X4[TX_TYPES][16];
+  unsigned int non_zero_count_8X8[TX_TYPES][64];
+  unsigned int non_zero_count_16X16[TX_TYPES][256];
+  unsigned int non_zero_count_32X32[TX_TYPES][1024];
+  unsigned int txb_count[TX_SIZES][TX_TYPES];
+#endif
 
 #if CONFIG_REF_MV
   unsigned int newmv_mode[NEWMV_MODE_CONTEXTS][2];
@@ -165,8 +185,8 @@ typedef struct FRAME_COUNTS {
   unsigned int inter_ext_tx[EXT_TX_SIZES][TX_TYPES];
 } FRAME_COUNTS;
 
-extern const aom_prob
-    av1_kf_y_mode_prob[INTRA_MODES][INTRA_MODES][INTRA_MODES - 1];
+extern const aom_prob av1_kf_y_mode_prob[INTRA_MODES][INTRA_MODES]
+                                        [INTRA_MODES - 1];
 #if CONFIG_DAALA_EC
 extern aom_cdf_prob av1_kf_y_mode_cdf[INTRA_MODES][INTRA_MODES][INTRA_MODES];
 #endif
@@ -175,14 +195,16 @@ extern aom_cdf_prob av1_kf_y_mode_cdf[INTRA_MODES][INTRA_MODES][INTRA_MODES];
 extern const aom_prob av1_default_palette_y_mode_prob[PALETTE_BLOCK_SIZES]
                                                      [PALETTE_Y_MODE_CONTEXTS];
 extern const aom_prob av1_default_palette_uv_mode_prob[2];
-extern const aom_prob
-    av1_default_palette_y_size_prob[PALETTE_BLOCK_SIZES][PALETTE_SIZES - 1];
-extern const aom_prob
-    av1_default_palette_uv_size_prob[PALETTE_BLOCK_SIZES][PALETTE_SIZES - 1];
-extern const aom_prob av1_default_palette_y_color_prob
-    [PALETTE_MAX_SIZE - 1][PALETTE_COLOR_CONTEXTS][PALETTE_COLORS - 1];
-extern const aom_prob av1_default_palette_uv_color_prob
-    [PALETTE_MAX_SIZE - 1][PALETTE_COLOR_CONTEXTS][PALETTE_COLORS - 1];
+extern const aom_prob av1_default_palette_y_size_prob[PALETTE_BLOCK_SIZES]
+                                                     [PALETTE_SIZES - 1];
+extern const aom_prob av1_default_palette_uv_size_prob[PALETTE_BLOCK_SIZES]
+                                                      [PALETTE_SIZES - 1];
+extern const aom_prob av1_default_palette_y_color_prob[PALETTE_MAX_SIZE - 1]
+                                                      [PALETTE_COLOR_CONTEXTS]
+                                                      [PALETTE_COLORS - 1];
+extern const aom_prob av1_default_palette_uv_color_prob[PALETTE_MAX_SIZE - 1]
+                                                       [PALETTE_COLOR_CONTEXTS]
+                                                       [PALETTE_COLORS - 1];
 #endif  // CONFIG_PALETTE
 
 extern const aom_tree_index av1_intra_mode_tree[TREE_SIZE(INTRA_MODES)];
@@ -202,8 +224,8 @@ extern const aom_tree_index
 
 #if CONFIG_PALETTE
 extern const aom_tree_index av1_palette_size_tree[TREE_SIZE(PALETTE_SIZES)];
-extern const aom_tree_index
-    av1_palette_color_tree[PALETTE_MAX_SIZE - 1][TREE_SIZE(PALETTE_COLORS)];
+extern const aom_tree_index av1_palette_color_tree[PALETTE_MAX_SIZE - 1]
+                                                  [TREE_SIZE(PALETTE_COLORS)];
 #endif  // CONFIG_PALETTE
 
 #if CONFIG_DAALA_EC
