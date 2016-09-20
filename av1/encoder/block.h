@@ -169,6 +169,10 @@ struct macroblock {
   // 1 if neither AC nor DC is coded. Only used during RDO.
   int pvq_skip[MAX_MB_PLANE];
   PVQ_QUEUE *pvq_q;
+  // 256 is the max # of 4x4 blocks in a SB (64x64), which comes from:
+  // 1) Since PVQ is applied to each trasnform-ed block
+  // 2) 4x4 is the smallest tx size in AV1
+  // 3) AV1 allows using smaller tx size than block (i.e. partition) size
   PVQ_INFO pvq[256][3];  // 16x16 of 4x4 blocks, YUV
   daala_enc_ctx daala_enc;
   int pvq_speed;
