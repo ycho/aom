@@ -2613,10 +2613,6 @@ static void rd_pick_partition(const AV1_COMP *const cpi, ThreadData *td,
 
   if (bsize == BLOCK_64X64) {
 #if !CONFIG_PVQ
-    // TODO: Can enable this later, if pvq actually generates tokens
-    // in aom format, otherwise pvq don't really need to use aom's token format
-    // but directly writes to bitstream in packing and keep below assert
-    // disabled.
     assert(tp_orig < *tp || (tp_orig == *tp && xd->mi[0]->mbmi.skip));
 #endif
     assert(best_rdc.rate < INT_MAX);

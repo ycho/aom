@@ -1406,14 +1406,14 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
       daala_enc, ref_int32, in_int32, out_int32,
       (int)quant[0] >> quant_shift,  // scale/quantizer
       (int)quant[1] >> quant_shift,  // scale/quantizer
-      /* TODO(yushin): Instead of 0,
-         use daala_enc->use_activity_masking for activity masking. */
+      // TODO(yushin): Instead of 0,
+      //   use daala_enc->use_activity_masking for activity masking.
       plane, tx_size, OD_PVQ_BETA[0][plane][tx_size],
       1,        // OD_ROBUST_STREAM
       0,        // is_keyframe,
       0, 0, 0,  // q_scaling, bx, by,
       daala_enc->state.qm + off, daala_enc->state.qm_inv + off,
-      speed, // speed
+      speed,  // speed
       pvq_info);
 
   if (skip && pvq_info) assert(pvq_info->ac_dc_coded == 0);
@@ -1451,13 +1451,15 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
 
   *eob = tx_blk_size * tx_blk_size;
 
-  *rate = (od_ec_enc_tell_frac(&daala_enc->ec) - tell) << (AV1_PROB_COST_SHIFT - OD_BITRES);
+  *rate = (od_ec_enc_tell_frac(&daala_enc->ec) - tell)
+          << (AV1_PROB_COST_SHIFT - OD_BITRES);
   assert(*rate >= 0);
 
   return skip;
 }
 
-void av1_store_pvq_enc_info(PVQ_INFO *pvq_info, int *qg, int *theta, int *max_theta,
+void av1_store_pvq_enc_info(PVQ_INFO *pvq_info, int *qg, int *theta,
+                            int *max_theta,
                             int *k, od_coeff *y, int nb_bands, const int *off,
                             int *size, int skip_rest, int skip_dir,
                             int bs) {  // block size in log_2 -2

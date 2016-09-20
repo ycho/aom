@@ -416,7 +416,8 @@ static void inverse_transform_block_intra(MACROBLOCKD *xd, int plane,
 
 #if CONFIG_PVQ
 static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
-                                 int16_t *dqcoeff, int16_t *quant, int pli, int bs,
+                                 int16_t *dqcoeff, int16_t *quant,
+                                 int pli, int bs,
                                  TX_TYPE tx_type, int xdec, int ac_dc_coded) {
   unsigned int flags;  // used for daala's stream analyzer.
   int off;
@@ -446,7 +447,8 @@ static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
   if (lossless)
     pvq_dc_quant = 1;
   else {
-    // TODO(yushin): Enable this for activity masking, when pvq_qm_q4 is available in AOM.
+    // TODO(yushin): Enable this for activity masking,
+    // when pvq_qm_q4 is available in AOM.
     // pvq_dc_quant = OD_MAXI(1, quant*
     // dec->state.pvq_qm_q4[pli][od_qm_get_index(bs, 0)] >> 4);
     pvq_dc_quant = OD_MAXI(1, quant[0] >> quant_shift);

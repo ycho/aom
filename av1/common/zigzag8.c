@@ -3,6 +3,7 @@
 /* clang-format off */
 
 #include "odintrin.h"
+
 OD_EXTERN const unsigned char OD_ZIGZAG8_DCT_DCT[48][2] = {
   {4, 0}, {4, 1}, {5, 0}, {5, 1},
   {6, 0}, {7, 0}, {6, 1}, {7, 1},
