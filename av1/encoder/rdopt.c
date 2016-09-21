@@ -2171,11 +2171,7 @@ static int64_t rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
   int64_t this_distortion, this_sse;
 #if CONFIG_PVQ
   od_rollback_buffer buf;
-#endif
 
-  memset(x->skip_txfm, SKIP_TXFM_NONE, sizeof(x->skip_txfm));
-
-#if CONFIG_PVQ
   od_encode_checkpoint(&x->daala_enc, &buf);
 #endif
 #if CONFIG_PALETTE
