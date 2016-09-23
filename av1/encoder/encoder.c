@@ -65,6 +65,9 @@
 #include "aom_ports/mem.h"
 #include "aom_ports/system_state.h"
 #include "aom_scale/aom_scale.h"
+#if CONFIG_BITSTREAM_DEBUG
+#include "aom_util/debug_util.h"
+#endif  // CONFIG_BITSTREAM_DEBUG
 
 #define AM_SEGMENT_ID_INACTIVE 7
 #define AM_SEGMENT_ID_ACTIVE 0
@@ -1624,10 +1627,13 @@ AV1_COMP *av1_create_compressor(AV1EncoderConfig *oxcf,
   cm->free_mi = av1_enc_free_mi;
   cm->setup_mi = av1_enc_setup_mi;
 
-  CHECK_MEM_ERROR(cm, cm->fc, (FRAME_CONTEXT *)aom_calloc(1, sizeof(*cm->fc)));
-  CHECK_MEM_ERROR(
-      cm, cm->frame_contexts,
-      (FRAME_CONTEXT *)aom_calloc(FRAME_CONTEXTS, sizeof(*cm->frame_contexts)));
+  CHECK_MEM_ERROR(cm, cm->fc,
+                  (FRAME_CONTEXT *)aom_memalign(32, sizeof(*cm->fc)));
+  CHECK_MEM_ERROR(cm, cm->frame_contexts,
+                  (FRAME_CONTEXT *)aom_memalign(
+                      32, FRAME_CONTEXTS * sizeof(*cm->frame_contexts)));
+  memset(cm->fc, 0, sizeof(*cm->fc));
+  memset(cm->frame_contexts, 0, FRAME_CONTEXTS * sizeof(*cm->frame_contexts));
 
   cpi->resize_state = 0;
   cpi->resize_avg_qp = 0;
@@ -2656,10 +2662,8 @@ static void loopfilter_frame(AV1_COMP *cpi, AV1_COMMON *cm) {
     int fb_size_log2, strength_y, strength_u, strength_v;
     av1_clpf_test_frame(frame, cpi->Source, cm, &strength_y, &fb_size_log2,
                         AOM_PLANE_Y);
-    av1_clpf_test_frame(frame, cpi->Source, cm, &strength_u, &fb_size_log2,
-                        AOM_PLANE_U);
-    av1_clpf_test_frame(frame, cpi->Source, cm, &strength_v, &fb_size_log2,
-                        AOM_PLANE_V);
+    av1_clpf_test_frame(frame, cpi->Source, cm, &strength_u, 0, AOM_PLANE_U);
+    av1_clpf_test_frame(frame, cpi->Source, cm, &strength_v, 0, AOM_PLANE_V);
 
     if (!fb_size_log2) fb_size_log2 = get_msb(MAX_FB_SIZE);
 
@@ -4267,6 +4271,13 @@ int av1_get_compressed_data(AV1_COMP *cpi, unsigned int *frame_flags,
   int brf_src_index;
 #endif  // CONFIG_EXT_REFS
   int i;
+
+#if CONFIG_BITSTREAM_DEBUG
+  assert(cpi->oxcf.max_threads == 0 &&
+         "bitstream debug tool does not support multithreading");
+  bitstream_queue_record_write();
+  bitstream_queue_set_frame_write(cm->current_video_frame * 2 + cm->show_frame);
+#endif
 
   aom_usec_timer_start(&cmptimer);
 

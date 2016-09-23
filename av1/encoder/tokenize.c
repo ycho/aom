@@ -379,6 +379,7 @@ static void tokenize_b(int plane, int block, int blk_row, int blk_col,
                        BLOCK_SIZE plane_bsize, TX_SIZE tx_size, void *arg) {
   struct tokenize_b_args *const args = arg;
   const AV1_COMP *cpi = args->cpi;
+  const AV1_COMMON *const cm = &cpi->common;
   ThreadData *const td = args->td;
   MACROBLOCK *const x = &td->mb;
   MACROBLOCKD *const xd = &x->e_mbd;
@@ -396,7 +397,7 @@ static void tokenize_b(int plane, int block, int blk_row, int blk_col,
   const int segment_id = mbmi->segment_id;
   const int16_t *scan, *nb;
   const TX_TYPE tx_type = get_tx_type(type, xd, block);
-  const SCAN_ORDER *const scan_order = get_scan(tx_size, tx_type);
+  const SCAN_ORDER *const scan_order = get_scan(cm, tx_size, tx_type);
   const int ref = is_inter_block(mbmi);
   unsigned int(*const counts)[COEFF_CONTEXTS][ENTROPY_TOKENS] =
       td->rd_counts.coef_counts[tx_size][type][ref];
@@ -463,6 +464,14 @@ static void tokenize_b(int plane, int block, int blk_row, int blk_col,
   }
 
   *tp = t;
+
+#if CONFIG_ADAPT_SCAN
+  // Since dqcoeff is not available here, we pass qcoeff into
+  // av1_update_scan_count_facade(). The update behavior should be the same
+  // because av1_update_scan_count_facade() only cares if coefficients are zero
+  // or not.
+  av1_update_scan_count_facade((AV1_COMMON *)cm, tx_size, tx_type, qcoeff, c);
+#endif
 
   av1_set_contexts(xd, pd, tx_size, c > 0, blk_col, blk_row);
 }

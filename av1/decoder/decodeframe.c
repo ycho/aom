@@ -26,6 +26,9 @@
 #include "aom_ports/mem_ops.h"
 #include "aom_scale/aom_scale.h"
 #include "aom_util/aom_thread.h"
+#if CONFIG_BITSTREAM_DEBUG
+#include "aom_util/debug_util.h"
+#endif  // CONFIG_BITSTREAM_DEBUG
 
 #include "av1/common/alloccommon.h"
 #if CONFIG_CLPF
@@ -282,11 +285,11 @@ static void read_mv_probs(nmv_context *ctx, int allow_hp, aom_reader *r) {
   }
 }
 
-static void inverse_transform_block_inter(MACROBLOCKD *xd, int plane,
-                                          const TX_SIZE tx_size, uint8_t *dst,
-                                          int stride, int eob, int block) {
+static void inverse_transform_block(MACROBLOCKD *xd, int plane,
+                                    const TX_TYPE tx_type,
+                                    const TX_SIZE tx_size, uint8_t *dst,
+                                    int stride, int eob) {
   struct macroblockd_plane *const pd = &xd->plane[plane];
-  TX_TYPE tx_type = get_tx_type(pd->plane_type, xd, block);
   const int seg_id = xd->mi[0]->mbmi.segment_id;
   if (eob > 0) {
     tran_low_t *const dqcoeff = pd->dqcoeff;
@@ -336,81 +339,17 @@ static void inverse_transform_block_inter(MACROBLOCKD *xd, int plane,
     if (eob == 1) {
       dqcoeff[0] = 0;
     } else {
+#if CONFIG_ADAPT_SCAN
+      memset(dqcoeff, 0, tx_size_2d[tx_size] * sizeof(dqcoeff[0]));
+#else   // CONFIG_ADAPT_SCAN
       if (tx_type == DCT_DCT && tx_size <= TX_16X16 && eob <= 10)
         memset(dqcoeff, 0, 4 * tx_size_1d[tx_size] * sizeof(dqcoeff[0]));
       else if (tx_size == TX_32X32 && eob <= 34)
         memset(dqcoeff, 0, 256 * sizeof(dqcoeff[0]));
       else
-        memset(dqcoeff, 0,
-               (1 << (tx_size_1d_log2[tx_size] * 2)) * sizeof(dqcoeff[0]));
+        memset(dqcoeff, 0, tx_size_2d[tx_size] * sizeof(dqcoeff[0]));
+#endif  // CONFIG_ADAPT_SCAN
     }
-  }
-}
-
-static void inverse_transform_block_intra(MACROBLOCKD *xd, int plane,
-                                          const TX_TYPE tx_type,
-                                          const TX_SIZE tx_size, uint8_t *dst,
-                                          int stride, int eob) {
-  struct macroblockd_plane *const pd = &xd->plane[plane];
-  const int seg_id = xd->mi[0]->mbmi.segment_id;
-  if (eob > 0) {
-    tran_low_t *const dqcoeff = pd->dqcoeff;
-#if CONFIG_AOM_HIGHBITDEPTH
-    if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
-      switch (tx_size) {
-        case TX_4X4:
-          av1_highbd_inv_txfm_add_4x4(dqcoeff, dst, stride, eob, xd->bd,
-                                      tx_type, xd->lossless[seg_id]);
-          break;
-        case TX_8X8:
-          av1_highbd_inv_txfm_add_8x8(dqcoeff, dst, stride, eob, xd->bd,
-                                      tx_type);
-          break;
-        case TX_16X16:
-          av1_highbd_inv_txfm_add_16x16(dqcoeff, dst, stride, eob, xd->bd,
-                                        tx_type);
-          break;
-        case TX_32X32:
-          av1_highbd_inv_txfm_add_32x32(dqcoeff, dst, stride, eob, xd->bd,
-                                        tx_type);
-          break;
-        default: assert(0 && "Invalid transform size"); return;
-      }
-    } else {
-#endif  // CONFIG_AOM_HIGHBITDEPTH
-      switch (tx_size) {
-        case TX_4X4:
-          av1_inv_txfm_add_4x4(dqcoeff, dst, stride, eob, tx_type,
-                               xd->lossless[seg_id]);
-          break;
-        case TX_8X8:
-          av1_inv_txfm_add_8x8(dqcoeff, dst, stride, eob, tx_type);
-          break;
-        case TX_16X16:
-          av1_inv_txfm_add_16x16(dqcoeff, dst, stride, eob, tx_type);
-          break;
-        case TX_32X32:
-          av1_inv_txfm_add_32x32(dqcoeff, dst, stride, eob, tx_type);
-          break;
-        default: assert(0 && "Invalid transform size"); return;
-      }
-#if CONFIG_AOM_HIGHBITDEPTH
-    }
-#endif  // CONFIG_AOM_HIGHBITDEPTH
-
-#if !CONFIG_PVQ
-    if (eob == 1) {
-      dqcoeff[0] = 0;
-    } else {
-      if (tx_type == DCT_DCT && tx_size <= TX_16X16 && eob <= 10)
-        memset(dqcoeff, 0, 4 * tx_size_1d[tx_size] * sizeof(dqcoeff[0]));
-      else if (tx_size == TX_32X32 && eob <= 34)
-        memset(dqcoeff, 0, 256 * sizeof(dqcoeff[0]));
-      else
-        memset(dqcoeff, 0,
-               (1 << (tx_size_1d_log2[tx_size] * 2)) * sizeof(dqcoeff[0]));
-    }
-#endif
   }
 }
 
@@ -490,11 +429,9 @@ static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
 }
 #endif
 
-static void predict_and_reconstruct_intra_block(MACROBLOCKD *const xd,
-                                                aom_reader *r,
-                                                MB_MODE_INFO *const mbmi,
-                                                int plane, int row, int col,
-                                                TX_SIZE tx_size) {
+static void predict_and_reconstruct_intra_block(
+    AV1_COMMON *cm, MACROBLOCKD *const xd, aom_reader *r,
+    MB_MODE_INFO *const mbmi, int plane, int row, int col, TX_SIZE tx_size) {
   struct macroblockd_plane *const pd = &xd->plane[plane];
   PREDICTION_MODE mode = (plane == 0) ? mbmi->mode : mbmi->uv_mode;
   PLANE_TYPE plane_type = (plane == 0) ? PLANE_TYPE_Y : PLANE_TYPE_UV;
@@ -514,12 +451,14 @@ static void predict_and_reconstruct_intra_block(MACROBLOCKD *const xd,
   if (!mbmi->skip) {
     TX_TYPE tx_type = get_tx_type(plane_type, xd, block_idx);
 #if !CONFIG_PVQ
-    const SCAN_ORDER *scan_order = get_scan(tx_size, tx_type);
+    const SCAN_ORDER *scan_order = get_scan(cm, tx_size, tx_type);
     const int eob = av1_decode_block_tokens(xd, plane, scan_order, col, row,
                                             tx_size, r, mbmi->segment_id);
-
-    inverse_transform_block_intra(xd, plane, tx_type, tx_size, dst,
-                                  pd->dst.stride, eob);
+#if CONFIG_ADAPT_SCAN
+    av1_update_scan_count_facade(cm, tx_size, tx_type, pd->dqcoeff, eob);
+#endif
+    inverse_transform_block(xd, plane, tx_type, tx_size, dst, pd->dst.stride,
+                            eob);
 #else
     // pvq_decode() for intra block runs here.
     // transform block size in pixels
@@ -572,29 +511,32 @@ static void predict_and_reconstruct_intra_block(MACROBLOCKD *const xd,
         for (j = 0; j < tx_blk_size; j++)
           for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
 
-        inverse_transform_block_intra(xd, plane, tx_type, tx_size, dst,
-                                      pd->dst.stride, eob);
+        inverse_transform_block(xd, plane, tx_type, tx_size, dst,
+                                pd->dst.stride, eob);
       }
     }
 #endif
   }
 }
 
-static int reconstruct_inter_block(MACROBLOCKD *const xd, aom_reader *r,
-                                   MB_MODE_INFO *const mbmi, int plane, int row,
-                                   int col, TX_SIZE tx_size) {
+static int reconstruct_inter_block(AV1_COMMON *cm, MACROBLOCKD *const xd,
+                                   aom_reader *r, MB_MODE_INFO *const mbmi,
+                                   int plane, int row, int col,
+                                   TX_SIZE tx_size) {
   struct macroblockd_plane *const pd = &xd->plane[plane];
   PLANE_TYPE plane_type = (plane == 0) ? PLANE_TYPE_Y : PLANE_TYPE_UV;
   int block_idx = (row << 1) + col;
   TX_TYPE tx_type = get_tx_type(plane_type, xd, block_idx);
 #if !CONFIG_PVQ
-  const SCAN_ORDER *scan_order = get_scan(tx_size, tx_type);
-  const int eob = av1_decode_block_tokens(xd, plane, scan_order, col, row,
-                                          tx_size, r, mbmi->segment_id);
-
-  inverse_transform_block_inter(
-      xd, plane, tx_size, &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
-      pd->dst.stride, eob, block_idx);
+    const SCAN_ORDER *scan_order = get_scan(cm, tx_size, tx_type);
+    const int eob = av1_decode_block_tokens(xd, plane, scan_order, col, row,
+                                            tx_size, r, mbmi->segment_id);
+  #if CONFIG_ADAPT_SCAN
+    av1_update_scan_count_facade(cm, tx_size, tx_type, pd->dqcoeff, eob);
+  #endif
+    inverse_transform_block(xd, plane, tx_type, tx_size,
+                            &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
+                            pd->dst.stride, eob);
 #else
   int ac_dc_coded;
   int eob = 0;
@@ -654,9 +596,8 @@ static int reconstruct_inter_block(MACROBLOCKD *const xd, aom_reader *r,
       for (j = 0; j < tx_blk_size; j++)
         for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
 
-      inverse_transform_block_inter(
-          xd, plane, tx_size, &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
-          pd->dst.stride, eob, block_idx);
+      inverse_transform_block(xd, plane, tx_size, dst,
+                              pd->dst.stride, eob, block_idx);
     }
   }
 #endif
@@ -776,7 +717,7 @@ static void decode_block(AV1Decoder *const pbi, MACROBLOCKD *const xd,
 
       for (row = 0; row < max_blocks_high; row += step)
         for (col = 0; col < max_blocks_wide; col += step)
-          predict_and_reconstruct_intra_block(xd, r, mbmi, plane, row, col,
+          predict_and_reconstruct_intra_block(cm, xd, r, mbmi, plane, row, col,
                                               tx_size);
     }
   } else {
@@ -810,8 +751,8 @@ static void decode_block(AV1Decoder *const pbi, MACROBLOCKD *const xd,
 
         for (row = 0; row < max_blocks_high; row += step)
           for (col = 0; col < max_blocks_wide; col += step)
-            eobtotal +=
-                reconstruct_inter_block(xd, r, mbmi, plane, row, col, tx_size);
+            eobtotal += reconstruct_inter_block(cm, xd, r, mbmi, plane, row,
+                                                col, tx_size);
       }
 
       if (!less8x8 && eobtotal == 0)
@@ -2587,12 +2528,18 @@ void av1_decode_frame(AV1Decoder *pbi, const uint8_t *data,
   struct aom_read_bit_buffer rb;
   int context_updated = 0;
   uint8_t clear_data[MAX_AV1_HEADER_SIZE];
-  const size_t first_partition_size = read_uncompressed_header(
-      pbi, init_read_bit_buffer(pbi, &rb, data, data_end, clear_data));
+  size_t first_partition_size;
   const int tile_rows = 1 << cm->log2_tile_rows;
   const int tile_cols = 1 << cm->log2_tile_cols;
   YV12_BUFFER_CONFIG *const new_fb = get_frame_new_buffer(cm);
   xd->cur_buf = new_fb;
+
+#if CONFIG_BITSTREAM_DEBUG
+  bitstream_queue_set_frame_read(cm->current_video_frame * 2 + cm->show_frame);
+#endif
+
+  first_partition_size = read_uncompressed_header(
+      pbi, init_read_bit_buffer(pbi, &rb, data, data_end, clear_data));
 
   if (!first_partition_size) {
 // showing a frame directly

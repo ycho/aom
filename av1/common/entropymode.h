@@ -38,6 +38,12 @@ extern "C" {
 
 struct AV1Common;
 
+typedef struct {
+  const int16_t *scan;
+  const int16_t *iscan;
+  const int16_t *neighbors;
+} SCAN_ORDER;
+
 struct tx_probs {
   aom_prob p32x32[TX_SIZE_CONTEXTS][TX_SIZES - 1];
   aom_prob p16x16[TX_SIZE_CONTEXTS][TX_SIZES - 2];
@@ -75,10 +81,22 @@ typedef struct frame_contexts {
   uint32_t non_zero_prob_16X16[TX_TYPES][256];
   uint32_t non_zero_prob_32X32[TX_TYPES][1024];
 
-  int16_t scan_4X4[TX_TYPES][16];
-  int16_t scan_8X8[TX_TYPES][64];
-  int16_t scan_16X16[TX_TYPES][256];
-  int16_t scan_32X32[TX_TYPES][1024];
+  DECLARE_ALIGNED(16, int16_t, scan_4X4[TX_TYPES][16]);
+  DECLARE_ALIGNED(16, int16_t, scan_8X8[TX_TYPES][64]);
+  DECLARE_ALIGNED(16, int16_t, scan_16X16[TX_TYPES][256]);
+  DECLARE_ALIGNED(16, int16_t, scan_32X32[TX_TYPES][1024]);
+
+  DECLARE_ALIGNED(16, int16_t, iscan_4X4[TX_TYPES][16]);
+  DECLARE_ALIGNED(16, int16_t, iscan_8X8[TX_TYPES][64]);
+  DECLARE_ALIGNED(16, int16_t, iscan_16X16[TX_TYPES][256]);
+  DECLARE_ALIGNED(16, int16_t, iscan_32X32[TX_TYPES][1024]);
+
+  int16_t nb_4X4[TX_TYPES][(16 + 1) * 2];
+  int16_t nb_8X8[TX_TYPES][(64 + 1) * 2];
+  int16_t nb_16X16[TX_TYPES][(256 + 1) * 2];
+  int16_t nb_32X32[TX_TYPES][(1024 + 1) * 2];
+
+  SCAN_ORDER sc[TX_SIZES][TX_TYPES];
 #endif
 
 #if CONFIG_REF_MV
