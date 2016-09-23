@@ -596,8 +596,8 @@ static int reconstruct_inter_block(AV1_COMMON *cm, MACROBLOCKD *const xd,
       for (j = 0; j < tx_blk_size; j++)
         for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
 
-      inverse_transform_block(xd, plane, tx_size, dst,
-                              pd->dst.stride, eob, block_idx);
+      inverse_transform_block(xd, plane, tx_type, tx_size, dst,
+                              pd->dst.stride, eob);
     }
   }
 #endif
