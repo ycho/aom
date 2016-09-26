@@ -864,7 +864,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
     n = OD_DIV_R0(abs(in[0] - ref[0]), dc_quant);
     if (n == 0) {
       out[0] = 0;
-    } else {
+    } else if (pli == 0) {
       int tell2;
       od_rollback_buffer dc_buf;
 
@@ -962,7 +962,7 @@ int od_pvq_encode(daala_enc_ctx *enc,
       n = OD_DIV_R0(abs(in[0] - ref[0]), dc_quant);
       if (n == 0) {
         out[0] = 0;
-      } else {
+      } else if (pli == 0) {
         int tell2;
         od_rollback_buffer dc_buf;
 
