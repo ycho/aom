@@ -764,11 +764,7 @@ static void decode_block(AV1Decoder *const pbi, MACROBLOCKD *const xd,
       }
 
       if (!less8x8 && eobtotal == 0)
-#if CONFIG_MISC_FIXES
         mbmi->has_no_coeffs = 1;  // skip loopfilter
-#else
-        mbmi->skip = 1;  // skip loopfilter
-#endif
     }
   }
 
@@ -1266,10 +1262,8 @@ static void setup_frame_size_with_refs(AV1_COMMON *cm,
       YV12_BUFFER_CONFIG *const buf = cm->frame_refs[i].buf;
       width = buf->y_crop_width;
       height = buf->y_crop_height;
-#if CONFIG_MISC_FIXES
       cm->render_width = buf->render_width;
       cm->render_height = buf->render_height;
-#endif
       found = 1;
       break;
     }
@@ -1277,9 +1271,7 @@ static void setup_frame_size_with_refs(AV1_COMMON *cm,
 
   if (!found) {
     av1_read_frame_size(rb, &width, &height);
-#if CONFIG_MISC_FIXES
     setup_render_size(cm, rb);
-#endif
   }
 
   if (width <= 0 || height <= 0)
@@ -1308,10 +1300,6 @@ static void setup_frame_size_with_refs(AV1_COMMON *cm,
   }
 
   resize_context_buffers(cm, width, height);
-#if !CONFIG_MISC_FIXES
-  setup_render_size(cm, rb);
-#endif
-
   lock_buffer_pool(pool);
   if (aom_realloc_frame_buffer(
           get_frame_new_buffer(cm), cm->width, cm->height, cm->subsampling_x,
@@ -2135,25 +2123,8 @@ static size_t read_uncompressed_header(AV1Decoder *pbi,
       if (!av1_read_sync_code(rb))
         aom_internal_error(&cm->error, AOM_CODEC_UNSUP_BITSTREAM,
                            "Invalid frame sync code");
-#if CONFIG_MISC_FIXES
+
       read_bitdepth_colorspace_sampling(cm, rb);
-#else
-      if (cm->profile > PROFILE_0) {
-        read_bitdepth_colorspace_sampling(cm, rb);
-      } else {
-        // NOTE: The intra-only frame header does not include the specification
-        // of either the color format or color sub-sampling in profile 0. AV1
-        // specifies that the default color format should be YUV 4:2:0 in this
-        // case (normative).
-        cm->color_space = AOM_CS_BT_601;
-        cm->color_range = 0;
-        cm->subsampling_y = cm->subsampling_x = 1;
-        cm->bit_depth = AOM_BITS_8;
-#if CONFIG_AOM_HIGHBITDEPTH
-        cm->use_highbitdepth = 0;
-#endif
-      }
-#endif
 
       pbi->refresh_frame_flags = aom_rb_read_literal(rb, REF_FRAMES);
       setup_frame_size(cm, rb);

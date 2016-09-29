@@ -2080,10 +2080,8 @@ static void write_frame_size_with_refs(AV1_COMP *cpi,
     if (cfg != NULL) {
       found =
           cm->width == cfg->y_crop_width && cm->height == cfg->y_crop_height;
-#if CONFIG_MISC_FIXES
       found &= cm->render_width == cfg->render_width &&
                cm->render_height == cfg->render_height;
-#endif
     }
     aom_wb_write_bit(wb, found);
     if (found) {
@@ -2094,15 +2092,8 @@ static void write_frame_size_with_refs(AV1_COMP *cpi,
   if (!found) {
     aom_wb_write_literal(wb, cm->width - 1, 16);
     aom_wb_write_literal(wb, cm->height - 1, 16);
-
-#if CONFIG_MISC_FIXES
     write_render_size(cm, wb);
-#endif
   }
-
-#if !CONFIG_MISC_FIXES
-  write_render_size(cm, wb);
-#endif
 }
 
 static void write_sync_code(struct aom_write_bit_buffer *wb) {
@@ -2233,15 +2224,7 @@ static void write_uncompressed_header(AV1_COMP *cpi,
 
     if (cm->intra_only) {
       write_sync_code(wb);
-
-#if CONFIG_MISC_FIXES
       write_bitdepth_colorspace_sampling(cm, wb);
-#else
-      // Note for profile 0, 420 8bpp is assumed.
-      if (cm->profile > PROFILE_0) {
-        write_bitdepth_colorspace_sampling(cm, wb);
-      }
-#endif
 
 #if CONFIG_EXT_REFS
       aom_wb_write_literal(wb, cpi->refresh_frame_mask, REF_FRAMES);
