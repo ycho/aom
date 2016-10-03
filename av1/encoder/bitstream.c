@@ -347,9 +347,9 @@ static void update_delta_q_probs(AV1_COMMON *cm, aom_writer *w,
                                  FRAME_COUNTS *counts) {
   int k;
 #if CONFIG_TILE_GROUPS
-  const probwt = cm->num_tg;
+  const int probwt = cm->num_tg;
 #else
-  const probwt = 1;
+  const int probwt = 1;
 #endif
   for (k = 0; k < DELTA_Q_CONTEXTS; ++k) {
     av1_cond_prob_diff_update(w, &cm->fc->delta_q_prob[k], counts->delta_q[k],
@@ -474,9 +474,6 @@ static void pack_mb_tokens(aom_writer *w, TOKENEXTRA **tp,
   const av1_extra_bit *const extra_bits_table = av1_extra_bits;
   (void)bit_depth;
 #endif  // CONFIG_AOM_HIGHBITDEPTH
-#if !CONFIG_MISC_FIXES
-  (void)tx;
-#endif
 
   while (p < stop && p->token != EOSB_TOKEN) {
     const uint8_t token = p->token;
@@ -536,12 +533,8 @@ static void pack_mb_tokens(aom_writer *w, TOKENEXTRA **tp,
       const int bit_string_length = extra_bits->len;  // Length of extra bits to
                                                       // be written excluding
                                                       // the sign bit.
-#if CONFIG_MISC_FIXES
       int skip_bits =
           (extra_bits->base_val == CAT6_MIN_VAL) ? TX_SIZES - 1 - tx : 0;
-#else
-      int skip_bits = 0;
-#endif
 
       if (bit_string_length > 0) {
         const unsigned char *pb = extra_bits->prob;
@@ -779,11 +772,7 @@ static void pack_inter_mode_mvs(AV1_COMP *cpi, const MODE_INFO *mi,
   const MACROBLOCKD *const xd = &x->e_mbd;
 #endif
   const struct segmentation *const seg = &cm->seg;
-#if CONFIG_MISC_FIXES
   const struct segmentation_probs *const segp = &cm->fc->seg;
-#else
-  const struct segmentation_probs *const segp = &cm->segp;
-#endif
   const MB_MODE_INFO *const mbmi = &mi->mbmi;
   const MB_MODE_INFO_EXT *const mbmi_ext = x->mbmi_ext;
   const PREDICTION_MODE mode = mbmi->mode;
@@ -987,11 +976,7 @@ static void write_mb_modes_kf(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                               MODE_INFO **mi_8x8, aom_writer *w) {
 #endif
   const struct segmentation *const seg = &cm->seg;
-#if CONFIG_MISC_FIXES
   const struct segmentation_probs *const segp = &cm->fc->seg;
-#else
-  const struct segmentation_probs *const segp = &cm->segp;
-#endif
   const MODE_INFO *const mi = mi_8x8[0];
   const MODE_INFO *const above_mi = xd->above_mi;
   const MODE_INFO *const left_mi = xd->left_mi;
@@ -1637,7 +1622,7 @@ static void encode_dering(int level, struct aom_write_bit_buffer *wb) {
 static void write_delta_q(struct aom_write_bit_buffer *wb, int delta_q) {
   if (delta_q != 0) {
     aom_wb_write_bit(wb, 1);
-    aom_wb_write_inv_signed_literal(wb, delta_q, CONFIG_MISC_FIXES ? 6 : 4);
+    aom_wb_write_inv_signed_literal(wb, delta_q, 6);
   } else {
     aom_wb_write_bit(wb, 0);
   }
@@ -1663,9 +1648,6 @@ static void encode_segmentation(AV1_COMMON *cm, MACROBLOCKD *xd,
   int i, j;
 
   const struct segmentation *seg = &cm->seg;
-#if !CONFIG_MISC_FIXES
-  const struct segmentation_probs *segp = &cm->segp;
-#endif
 
   aom_wb_write_bit(wb, seg->enabled);
   if (!seg->enabled) return;
@@ -1679,15 +1661,6 @@ static void encode_segmentation(AV1_COMMON *cm, MACROBLOCKD *xd,
   if (seg->update_map) {
     // Select the coding strategy (temporal or spatial)
     av1_choose_segmap_coding_method(cm, xd);
-#if !CONFIG_MISC_FIXES
-    // Write out probabilities used to decode unpredicted  macro-block segments
-    for (i = 0; i < SEG_TREE_PROBS; i++) {
-      const int prob = segp->tree_probs[i];
-      const int update = prob != MAX_PROB;
-      aom_wb_write_bit(wb, update);
-      if (update) aom_wb_write_literal(wb, prob, 8);
-    }
-#endif
 
     // Write out the chosen coding method.
     if (!frame_is_intra_only(cm) && !cm->error_resilient_mode) {
@@ -1695,17 +1668,6 @@ static void encode_segmentation(AV1_COMMON *cm, MACROBLOCKD *xd,
     } else {
       assert(seg->temporal_update == 0);
     }
-
-#if !CONFIG_MISC_FIXES
-    if (seg->temporal_update) {
-      for (i = 0; i < PREDICTION_PROBS; i++) {
-        const int prob = segp->pred_probs[i];
-        const int update = prob != MAX_PROB;
-        aom_wb_write_bit(wb, update);
-        if (update) aom_wb_write_literal(wb, prob, 8);
-      }
-    }
-#endif
   }
 
   // Segmentation data
@@ -1733,7 +1695,6 @@ static void encode_segmentation(AV1_COMMON *cm, MACROBLOCKD *xd,
   }
 }
 
-#if CONFIG_MISC_FIXES
 static void update_seg_probs(AV1_COMP *cpi, aom_writer *w) {
   AV1_COMMON *cm = &cpi->common;
 #if CONFIG_TILE_GROUPS
@@ -1767,12 +1728,6 @@ static void write_txfm_mode(TX_MODE mode, struct aom_write_bit_buffer *wb) {
   aom_wb_write_bit(wb, mode == TX_MODE_SELECT);
   if (mode != TX_MODE_SELECT) aom_wb_write_literal(wb, mode, 2);
 }
-#else
-static void write_txfm_mode(TX_MODE mode, aom_writer *wb) {
-  aom_write_literal(wb, AOMMIN(mode, ALLOW_32X32), 2);
-  if (mode >= ALLOW_32X32) aom_write_bit(wb, mode == TX_MODE_SELECT);
-}
-#endif
 
 static void update_txfm_probs(AV1_COMMON *cm, aom_writer *w,
                               FRAME_COUNTS *counts) {
@@ -1920,12 +1875,7 @@ static size_t encode_tiles(AV1_COMP *cpi, uint8_t *data_ptr,
   unsigned int max_tile = 0;
 #if CONFIG_TILE_GROUPS
   const int n_log2_tiles = cm->log2_tile_rows + cm->log2_tile_cols;
-#if CONFIG_MISC_FIXES
   const int have_tiles = n_log2_tiles > 0;
-#else
-  const int have_tiles = 0;  // we have tiles, but we don't want to write a
-                             // tile size marker in the header
-#endif
 
   size_t comp_hdr_size;
   // Fixed size tile groups for the moment
@@ -2008,7 +1958,7 @@ static size_t encode_tiles(AV1_COMP *cpi, uint8_t *data_ptr,
       assert(tok == tok_end);
       ans_write_init(&ans, data_ptr + total_size + 4 * !is_last_tile);
       buf_ans_flush(buf_ans, &ans);
-      tile_size = ans_write_end(&ans) - CONFIG_MISC_FIXES;
+      tile_size = ans_write_end(&ans) - 1;
 #else
       aom_start_encode(&residual_bc, data_ptr + total_size + 4 * !is_last_tile);
 
@@ -2021,7 +1971,7 @@ static size_t encode_tiles(AV1_COMP *cpi, uint8_t *data_ptr,
                   tok_end);
       assert(tok == tok_end);
       aom_stop_encode(&residual_bc);
-      tile_size = residual_bc.pos - CONFIG_MISC_FIXES;
+      tile_size = residual_bc.pos - 1;
 #endif
 #if CONFIG_PVQ
       cpi->td.mb.pvq_q = NULL;
@@ -2033,7 +1983,7 @@ static size_t encode_tiles(AV1_COMP *cpi, uint8_t *data_ptr,
         max_tile = max_tile > tile_size ? max_tile : tile_size;
         total_size += 4;
       }
-      total_size += tile_size + CONFIG_MISC_FIXES;
+      total_size += tile_size + 1;
     }
   }
 #if CONFIG_TILE_GROUPS
@@ -2199,7 +2149,6 @@ static void write_uncompressed_header(AV1_COMP *cpi,
     if (!cm->show_frame) aom_wb_write_bit(wb, cm->intra_only);
 
     if (!cm->error_resilient_mode) {
-#if CONFIG_MISC_FIXES
       if (cm->intra_only) {
         aom_wb_write_bit(wb,
                          cm->reset_frame_context == RESET_FRAME_CONTEXT_ALL);
@@ -2210,12 +2159,6 @@ static void write_uncompressed_header(AV1_COMP *cpi,
           aom_wb_write_bit(wb,
                            cm->reset_frame_context == RESET_FRAME_CONTEXT_ALL);
       }
-#else
-      static const int reset_frame_context_conv_tbl[3] = { 0, 2, 3 };
-
-      aom_wb_write_literal(
-          wb, reset_frame_context_conv_tbl[cm->reset_frame_context], 2);
-#endif
     }
 
 #if CONFIG_EXT_REFS
@@ -2276,9 +2219,7 @@ static void write_uncompressed_header(AV1_COMP *cpi,
   if (!cm->error_resilient_mode) {
     aom_wb_write_bit(wb,
                      cm->refresh_frame_context != REFRESH_FRAME_CONTEXT_OFF);
-#if CONFIG_MISC_FIXES
     if (cm->refresh_frame_context != REFRESH_FRAME_CONTEXT_OFF)
-#endif
       aom_wb_write_bit(
           wb, cm->refresh_frame_context != REFRESH_FRAME_CONTEXT_BACKWARD);
   }
@@ -2315,7 +2256,6 @@ static void write_uncompressed_header(AV1_COMP *cpi,
   }
 #endif
 
-#if CONFIG_MISC_FIXES
   if (!cm->seg.enabled && xd->lossless[0])
     cm->tx_mode = TX_4X4;
   else
@@ -2327,7 +2267,6 @@ static void write_uncompressed_header(AV1_COMP *cpi,
     aom_wb_write_bit(wb, use_hybrid_pred);
     if (!use_hybrid_pred) aom_wb_write_bit(wb, use_compound_pred);
   }
-#endif
 
   write_tile_info(cm, wb);
 }
@@ -2355,17 +2294,7 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
   aom_start_encode(header_bc, data);
 #endif
 
-#if !CONFIG_MISC_FIXES
-  if (cpi->td.mb.e_mbd.lossless[0]) {
-    cm->tx_mode = TX_4X4;
-  } else {
-    write_txfm_mode(cm->tx_mode, header_bc);
-    update_txfm_probs(cm, header_bc, counts);
-  }
-#else
   update_txfm_probs(cm, header_bc, counts);
-#endif
-
 #if !CONFIG_PVQ
   update_coef_probs(cpi, header_bc);
 #endif
@@ -2373,7 +2302,6 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
 #if CONFIG_DELTA_Q
   update_delta_q_probs(cm, header_bc, counts);
 #endif
-#if CONFIG_MISC_FIXES
   update_seg_probs(cpi, header_bc);
 
   for (i = 0; i < INTRA_MODES; ++i) {
@@ -2393,14 +2321,12 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
                     cm->fc->partition_cdf[i]);
 #endif
   }
-#endif
 
   if (frame_is_intra_only(cm)) {
     av1_copy(cm->kf_y_prob, av1_kf_y_mode_prob);
 #if CONFIG_DAALA_EC
     av1_copy(cm->kf_y_cdf, av1_kf_y_mode_cdf);
 #endif
-#if CONFIG_MISC_FIXES
     for (i = 0; i < INTRA_MODES; ++i)
       for (j = 0; j < INTRA_MODES; ++j) {
         prob_diff_update(av1_intra_mode_tree, cm->kf_y_prob[i][j],
@@ -2411,7 +2337,6 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
                         cm->kf_y_cdf[i][j]);
 #endif
       }
-#endif
   } else {
 #if CONFIG_REF_MV
     update_inter_mode_probs(cm, header_bc, counts);
@@ -2441,23 +2366,10 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
 
     if (cpi->allow_comp_inter_inter) {
       const int use_hybrid_pred = cm->reference_mode == REFERENCE_MODE_SELECT;
-#if !CONFIG_MISC_FIXES
-      const int use_compound_pred = cm->reference_mode != SINGLE_REFERENCE;
-
-      aom_write_bit(header_bc, use_compound_pred);
-      if (use_compound_pred) {
-        aom_write_bit(header_bc, use_hybrid_pred);
-        if (use_hybrid_pred)
-          for (i = 0; i < COMP_INTER_CONTEXTS; i++)
-            av1_cond_prob_diff_update(header_bc, &fc->comp_inter_prob[i],
-                                      counts->comp_inter[i], probwt);
-      }
-#else
       if (use_hybrid_pred)
         for (i = 0; i < COMP_INTER_CONTEXTS; i++)
           av1_cond_prob_diff_update(header_bc, &fc->comp_inter_prob[i],
                                     counts->comp_inter[i], probwt);
-#endif
     }
 
     if (cm->reference_mode != COMPOUND_REFERENCE)
@@ -2491,18 +2403,6 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
 #endif
     }
 
-#if !CONFIG_MISC_FIXES
-    for (i = 0; i < PARTITION_CONTEXTS; ++i) {
-      prob_diff_update(av1_partition_tree, fc->partition_prob[i],
-                       counts->partition[i], PARTITION_TYPES, probwt,
-                       header_bc);
-#if CONFIG_DAALA_EC
-      av1_tree_to_cdf(av1_partition_tree, cm->fc->partition_prob[i],
-                      cm->fc->partition_cdf[i]);
-#endif
-    }
-#endif
-
     av1_write_nmv_probs(cm, cm->allow_high_precision_mv, header_bc,
 #if CONFIG_REF_MV
                         counts->mv);
@@ -2529,7 +2429,6 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
 #endif  // CONFIG_ANS
 }
 
-#if CONFIG_MISC_FIXES
 static int remux_tiles(uint8_t *dest, const int sz, const int n_tiles,
                        const int mag) {
   int rpos = 0, wpos = 0, n;
@@ -2562,7 +2461,6 @@ static int remux_tiles(uint8_t *dest, const int sz, const int n_tiles,
 
   return wpos;
 }
-#endif
 
 void av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dest, size_t *size) {
   uint8_t *data = dest;
@@ -2573,19 +2471,12 @@ void av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dest, size_t *size) {
   size_t data_sz;
   struct aom_write_bit_buffer wb = { data, 0 };
   unsigned int max_tile;
-#if CONFIG_MISC_FIXES || CONFIG_EXT_REFS
   AV1_COMMON *const cm = &cpi->common;
-#endif  // CONFIG_MISC_FIXES || CONFIG_EXT_REFS
 
 #if !CONFIG_TILE_GROUPS
   size_t uncompressed_hdr_size;
-#if CONFIG_MISC_FIXES
   const int n_log2_tiles = cm->log2_tile_rows + cm->log2_tile_cols;
   const int have_tiles = n_log2_tiles > 0;
-#else
-  const int have_tiles = 0;  // we have tiles, but we don't want to write a
-                             // tile size marker in the header
-#endif
 
 #if CONFIG_BITSTREAM_DEBUG
   bitstream_queue_reset_write();
@@ -2615,7 +2506,6 @@ void av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dest, size_t *size) {
   data_sz = encode_tiles(cpi, &wb, &max_tile);
 #endif
 #if !CONFIG_TILE_GROUPS
-#if CONFIG_MISC_FIXES
   /* A global size of tile lengths in a frame does not fit with tile
      groups, as we may want to transmit a tile group as soon as encoded,
      rather than buffering the frame.
@@ -2637,8 +2527,6 @@ void av1_pack_bitstream(AV1_COMP *const cpi, uint8_t *dest, size_t *size) {
   } else {
     assert(n_log2_tiles == 0);
   }
-#endif
-
   // TODO(jbb): Figure out what to do if first_part_size > 16 bits.
   aom_wb_write_literal(&saved_wb, (int)first_part_size, 16);
 #endif

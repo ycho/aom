@@ -231,19 +231,26 @@ static uint8_t scan_blk_mbmi(const AV1_COMMON *cm, const MACROBLOCKD *xd,
 
 static int has_top_right(const MACROBLOCKD *xd, int mi_row, int mi_col,
                          int bs) {
-  int has_tr =
-      !((mi_row & bs) & (bs * 2 - 1)) || !((mi_col & bs) & (bs * 2 - 1));
+  // In a split partition all apart from the bottom right has a top right
+  int has_tr = !((mi_row & bs) && (mi_col & bs));
 
-  // Filter out partial right-most boundaries
-  if ((mi_col & bs) & (bs * 2 - 1)) {
-    if (((mi_col & (2 * bs)) & (bs * 4 - 1)) &&
-        ((mi_row & (2 * bs)) & (bs * 4 - 1)))
-      has_tr = 0;
+  // bs > 0 and bs is a power of 2
+  assert(bs > 0 && !(bs & (bs - 1)));
+
+  // For each 4x4 group of blocks, when the bottom right is decoded the blocks
+  // to the right have not been decoded therefore the bottom right does
+  // not have a top right
+  while (bs < MAX_MIB_SIZE) {
+    if (mi_col & bs) {
+      if ((mi_col & (2 * bs)) && (mi_row & (2 * bs))) {
+        has_tr = 0;
+        break;
+      }
+    } else {
+      break;
+    }
+    bs <<= 1;
   }
-
-  if (has_tr)
-    if (((mi_col + xd->n8_w) & 0x07) == 0)
-      if ((mi_row & 0x07) > 0) has_tr = 0;
 
   if (xd->n8_w < xd->n8_h)
     if (!xd->is_sec_rect) has_tr = 1;
@@ -502,11 +509,6 @@ static void find_mv_refs_idx(const AV1_COMMON *cm, const MACROBLOCKD *xd,
   const int bw = num_8x8_blocks_wide_lookup[mi->mbmi.sb_type] << 3;
   const int bh = num_8x8_blocks_high_lookup[mi->mbmi.sb_type] << 3;
 
-#if !CONFIG_MISC_FIXES
-  // Blank the reference vector list
-  memset(mv_ref_list, 0, sizeof(*mv_ref_list) * MAX_MV_REF_CANDIDATES);
-#endif
-
   // The nearest 2 blocks are treated differently
   // if the size < 8x8 we get the mv from the bmi substructure,
   // and we also need to keep a mode count.
@@ -620,14 +622,8 @@ Done:
   if (mode_context)
     mode_context[ref_frame] = counter_to_context[context_counter];
 
-#if CONFIG_MISC_FIXES
   for (i = refmv_count; i < MAX_MV_REF_CANDIDATES; ++i)
     mv_ref_list[i].as_int = 0;
-#else
-  // Clamp vectors
-  for (i = 0; i < MAX_MV_REF_CANDIDATES; ++i)
-    clamp_mv_ref(&mv_ref_list[i].as_mv, bw, bh, xd);
-#endif
 }
 
 void av1_find_mv_refs(const AV1_COMMON *cm, const MACROBLOCKD *xd,
