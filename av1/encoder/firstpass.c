@@ -542,6 +542,7 @@ void av1_first_pass(AV1_COMP *cpi, const struct lookahead_entry *source) {
         aom_calloc(OD_QM_BUFFER_SIZE, sizeof(x->daala_enc.state.qm_inv[0])));
     x->daala_enc.qm = OD_FLAT_QM;  // Hard coded. Enc/dec required to sync.
     x->daala_enc.pvq_norm_lambda = OD_PVQ_LAMBDA;
+    x->daala_enc.pvq_norm_lambda_dc = OD_PVQ_LAMBDA;
 
     od_init_qm(x->daala_enc.state.qm, x->daala_enc.state.qm_inv,
                x->daala_enc.qm == OD_HVS_QM ? OD_QM8_Q4_HVS : OD_QM8_Q4_FLAT);
