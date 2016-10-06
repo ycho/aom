@@ -18,6 +18,8 @@
 # include "av1/common/pvq.h"
 # include "av1/encoder/encint.h"
 
+#define PVQ_CHROMA_RD 1
+
 void od_encode_band_pvq_splits(od_ec_enc *ec, od_pvq_codeword_ctx *adapt,
  const int *y, int n, int k, int level);
 

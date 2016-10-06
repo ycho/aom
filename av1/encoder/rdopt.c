@@ -2185,10 +2185,13 @@ static int64_t rd_pick_intra_sbuv_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
       this_rate += av1_cost_bit(
           av1_default_palette_uv_mode_prob[pmi->palette_size[0] > 0], 0);
 #endif  // CONFIG_PALETTE
-    this_rd = RDCOST(x->rdmult, x->rddiv, this_rate, this_distortion);
 
 #if CONFIG_PVQ
+    // For chroma channels, multiply 0.5 to lambda during intra prediction
+    this_rd = RDCOST(x->rdmult >> (1 * PVQ_CHROMA_RD), x->rddiv, this_rate, this_distortion);
     od_encode_rollback(&x->daala_enc, &buf);
+#else
+    this_rd = RDCOST(x->rdmult, x->rddiv, this_rate, this_distortion);
 #endif
 
     if (this_rd < best_rd) {
