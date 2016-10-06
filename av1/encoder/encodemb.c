@@ -986,13 +986,10 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   const int src_stride = p->src.stride;
   const int dst_stride = pd->dst.stride;
   FWD_TXFM_PARAM fwd_txfm_param;
-
-#if !CONFIG_PVQ
   int16_t *src_diff;
   int tx1d_size = tx_size_1d[tx_size];
 
-  src_diff = &p->src_diff[4 * (blk_row * diff_stride + blk_col)];
-#else
+#if CONFIG_PVQ
   tran_low_t *ref_coeff = BLOCK_OFFSET(pd->pvq_ref_coeff, block);
   int16_t *src_int16;
   int tx_blk_size;
@@ -1008,6 +1005,8 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   pvq_info = &x->pvq[block][plane];
   src_int16 = &p->src_int16[4 * (blk_row * diff_stride + blk_col)];
 #endif
+
+  src_diff = &p->src_diff[4 * (blk_row * diff_stride + blk_col)];
 
   fwd_txfm_param.tx_type = tx_type;
   fwd_txfm_param.tx_size = tx_size;
@@ -1090,9 +1089,10 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   }
 #endif  // CONFIG_AOM_HIGHBITDEPTH
 
-#if !CONFIG_PVQ
   aom_subtract_block(tx1d_size, tx1d_size, src_diff, diff_stride, src,
                      src_stride, dst, dst_stride);
+
+#if !CONFIG_PVQ
   fwd_txfm(src_diff, coeff, diff_stride, &fwd_txfm_param);
   switch (tx_size) {
     case TX_32X32:
