@@ -1249,6 +1249,7 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
   int has_dc_skip = 1;
   int i;
   int off = od_qm_offset(tx_size, plane ? 1 : 0);
+  double save_pvq_lambda;
 
   DECLARE_ALIGNED(16, int16_t, coeff_pvq[64 * 64]);
   DECLARE_ALIGNED(16, int16_t, ref_coeff_pvq[64 * 64]);
@@ -1274,6 +1275,12 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
     in_int32[i] = coeff_pvq[i];
   }
 
+#if 1
+  if (plane != 0) {
+    save_pvq_lambda = daala_enc->pvq_norm_lambda;
+    daala_enc->pvq_norm_lambda *= 0.5;
+  }
+#endif
   if (abs(in_int32[0] - ref_int32[0]) < pvq_dc_quant * 141 / 256) { /* 0.55 */
     out_int32[0] = 0;
   } else {
@@ -1332,7 +1339,9 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
   *rate = (od_ec_enc_tell_frac(&daala_enc->ec) - tell)
           << (AV1_PROB_COST_SHIFT - OD_BITRES);
   assert(*rate >= 0);
-
+#if 1
+  if (plane != 0) daala_enc->pvq_norm_lambda = save_pvq_lambda;
+#endif
   return skip;
 }
 
