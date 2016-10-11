@@ -168,6 +168,7 @@ struct macroblock {
   PVQ_INFO pvq[256][3];  // 16x16 of 4x4 blocks, YUV
   daala_enc_ctx daala_enc;
   int pvq_speed;
+  int pvq_coded;  // Indicates whether pvq_info needs be stored to tokenize
 #endif
 };
 

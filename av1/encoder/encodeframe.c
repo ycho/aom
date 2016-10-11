@@ -1024,6 +1024,7 @@ static void rd_pick_sb_modes(const AV1_COMP *const cpi, TileDataEnc *tile_data,
 
 #if CONFIG_PVQ
   x->pvq_speed = 1;
+  x->pvq_coded = 0;
 #endif
 
   set_offsets(cpi, tile_info, x, mi_row, mi_col, bsize);
@@ -3202,6 +3203,7 @@ static void encode_superblock(const AV1_COMP *const cpi, ThreadData *td,
 
 #if CONFIG_PVQ
   x->pvq_speed = 0;
+  x->pvq_coded = output_enabled ? 1 : 0;
 #endif
 
   if (!is_inter_block(mbmi)) {
