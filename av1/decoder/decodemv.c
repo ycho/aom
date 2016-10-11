@@ -28,7 +28,7 @@
 #define ACCT_STR __func__
 
 #if CONFIG_DAALA_EC
-static PREDICTION_MODE read_intra_mode(aom_reader *r, const aom_cdf_prob *cdf) {
+static PREDICTION_MODE read_intra_mode(aom_reader *r, aom_cdf_prob *cdf) {
   return (PREDICTION_MODE)
       av1_intra_mode_inv[aom_read_symbol(r, cdf, INTRA_MODES, ACCT_STR)];
 }
@@ -220,8 +220,7 @@ static MOTION_MODE read_motion_mode(AV1_COMMON *cm, MACROBLOCKD *xd,
 }
 #endif  // CONFIG_MOTION_VAR
 
-static int read_segment_id(aom_reader *r,
-                           const struct segmentation_probs *segp) {
+static int read_segment_id(aom_reader *r, struct segmentation_probs *segp) {
 #if CONFIG_DAALA_EC
   return aom_read_symbol(r, segp->tree_cdf, MAX_SEGMENTS, ACCT_STR);
 #else
@@ -569,12 +568,11 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
   }
 }
 
-static int read_mv_component(aom_reader *r, const nmv_component *mvcomp,
-                             int usehp) {
+static int read_mv_component(aom_reader *r, nmv_component *mvcomp, int usehp) {
   int mag, d, fr, hp;
   const int sign = aom_read(r, mvcomp->sign, ACCT_STR);
   const int mv_class =
-#if CONFIG_DAALA_EC
+#if CONFIG_DAALA_EC || CONFIG_RANS
       aom_read_symbol(r, mvcomp->class_cdf, MV_CLASSES, ACCT_STR);
 #else
       aom_read_tree(r, av1_mv_class_tree, mvcomp->classes, ACCT_STR);
@@ -595,7 +593,7 @@ static int read_mv_component(aom_reader *r, const nmv_component *mvcomp,
   }
 
 // Fractional part
-#if CONFIG_DAALA_EC
+#if CONFIG_DAALA_EC || CONFIG_RANS
   fr = aom_read_symbol(r, class0 ? mvcomp->class0_fp_cdf[d] : mvcomp->fp_cdf,
                        MV_FP_SIZE, ACCT_STR);
 #else
@@ -613,24 +611,23 @@ static int read_mv_component(aom_reader *r, const nmv_component *mvcomp,
 }
 
 static INLINE void read_mv(aom_reader *r, MV *mv, const MV *ref,
-                           const nmv_context *ctx, nmv_context_counts *counts,
+                           nmv_context *ctx, nmv_context_counts *counts,
                            int allow_hp) {
   const MV_JOINT_TYPE joint_type =
-#if CONFIG_DAALA_EC
+#if CONFIG_DAALA_EC || CONFIG_RANS
       (MV_JOINT_TYPE)aom_read_symbol(r, ctx->joint_cdf, MV_JOINTS, ACCT_STR);
 #else
       (MV_JOINT_TYPE)aom_read_tree(r, av1_mv_joint_tree, ctx->joints, ACCT_STR);
 #endif
-  const int use_hp = allow_hp && av1_use_mv_hp(ref);
   MV diff = { 0, 0 };
 
   if (mv_joint_vertical(joint_type))
-    diff.row = read_mv_component(r, &ctx->comps[0], use_hp);
+    diff.row = read_mv_component(r, &ctx->comps[0], allow_hp);
 
   if (mv_joint_horizontal(joint_type))
-    diff.col = read_mv_component(r, &ctx->comps[1], use_hp);
+    diff.col = read_mv_component(r, &ctx->comps[1], allow_hp);
 
-  av1_inc_mv(&diff, counts, use_hp);
+  av1_inc_mv(&diff, counts, allow_hp);
 
   mv->row = ref->row + diff.row;
   mv->col = ref->col + diff.col;

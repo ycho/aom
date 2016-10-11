@@ -30,8 +30,8 @@ void av1_entropy_mv_init(void) {
   av1_tokens_from_tree(mv_fp_encodings, av1_mv_fp_tree);
 }
 
-static void encode_mv_component(aom_writer *w, int comp,
-                                const nmv_component *mvcomp, int usehp) {
+static void encode_mv_component(aom_writer *w, int comp, nmv_component *mvcomp,
+                                int usehp) {
   int offset;
   const int sign = comp < 0;
   const int mag = sign ? -comp : comp;
@@ -46,7 +46,7 @@ static void encode_mv_component(aom_writer *w, int comp,
   aom_write(w, sign, mvcomp->sign);
 
 // Class
-#if CONFIG_DAALA_EC
+#if CONFIG_DAALA_EC || CONFIG_RANS
   aom_write_symbol(w, mv_class, mvcomp->class_cdf, MV_CLASSES);
 #else
   av1_write_token(w, av1_mv_class_tree, mvcomp->classes,
@@ -63,7 +63,7 @@ static void encode_mv_component(aom_writer *w, int comp,
   }
 
 // Fractional bits
-#if CONFIG_DAALA_EC
+#if CONFIG_DAALA_EC || CONFIG_RANS
   aom_write_symbol(
       w, fr, mv_class == MV_CLASS_0 ? mvcomp->class0_fp_cdf[d] : mvcomp->fp_cdf,
       MV_FP_SIZE);
@@ -150,6 +150,7 @@ static void update_mv(aom_writer *w, const unsigned int ct[2], aom_prob *cur_p,
 #endif
 }
 
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
 static void write_mv_update(const aom_tree_index *tree,
                             aom_prob probs[/*n - 1*/],
                             const unsigned int counts[/*n - 1*/], int n,
@@ -164,17 +165,24 @@ static void write_mv_update(const aom_tree_index *tree,
   for (i = 0; i < n - 1; ++i)
     update_mv(w, branch_ct[i], &probs[i], MV_UPDATE_PROB);
 }
+#endif
 
 void av1_write_nmv_probs(AV1_COMMON *cm, int usehp, aom_writer *w,
                          nmv_context_counts *const nmv_counts) {
-  int i, j;
+  int i;
 #if CONFIG_REF_MV
+  int j;
   int nmv_ctx = 0;
   for (nmv_ctx = 0; nmv_ctx < NMV_CONTEXTS; ++nmv_ctx) {
     nmv_context *const mvc = &cm->fc->nmvc[nmv_ctx];
     nmv_context_counts *const counts = &nmv_counts[nmv_ctx];
+
     write_mv_update(av1_mv_joint_tree, mvc->joints, counts->joints, MV_JOINTS,
                     w);
+#if CONFIG_DAALA_EC
+    av1_tree_to_cdf(av1_mv_joint_tree, cm->fc->nmvc.joints,
+                    cm->fc->nmvc.joint_cdf);
+#endif
 
     for (i = 0; i < 2; ++i) {
       nmv_component *comp = &mvc->comps[i];
@@ -210,7 +218,13 @@ void av1_write_nmv_probs(AV1_COMMON *cm, int usehp, aom_writer *w,
   nmv_context *const mvc = &cm->fc->nmvc;
   nmv_context_counts *const counts = nmv_counts;
 
+  int j;
+#if !CONFIG_EC_ADAPT || !(CONFIG_DAALA_EC || CONFIG_RANS)
   write_mv_update(av1_mv_joint_tree, mvc->joints, counts->joints, MV_JOINTS, w);
+#if CONFIG_DAALA_EC || CONFIG_RANS
+  av1_tree_to_cdf(av1_mv_joint_tree, cm->fc->nmvc.joints,
+                  cm->fc->nmvc.joint_cdf);
+#endif
 
   for (i = 0; i < 2; ++i) {
     nmv_component *comp = &mvc->comps[i];
@@ -219,7 +233,7 @@ void av1_write_nmv_probs(AV1_COMMON *cm, int usehp, aom_writer *w,
     update_mv(w, comp_counts->sign, &comp->sign, MV_UPDATE_PROB);
     write_mv_update(av1_mv_class_tree, comp->classes, comp_counts->classes,
                     MV_CLASSES, w);
-#if CONFIG_DAALA_EC
+#if CONFIG_DAALA_EC || CONFIG_RANS
     av1_tree_to_cdf(av1_mv_class_tree, comp->classes, comp->class_cdf);
 #endif
     write_mv_update(av1_mv_class0_tree, comp->class0, comp_counts->class0,
@@ -232,17 +246,18 @@ void av1_write_nmv_probs(AV1_COMMON *cm, int usehp, aom_writer *w,
     for (j = 0; j < CLASS0_SIZE; ++j) {
       write_mv_update(av1_mv_fp_tree, mvc->comps[i].class0_fp[j],
                       counts->comps[i].class0_fp[j], MV_FP_SIZE, w);
-#if CONFIG_DAALA_EC
+#if CONFIG_DAALA_EC || CONFIG_RANS
       av1_tree_to_cdf(av1_mv_fp_tree, mvc->comps[i].class0_fp[j],
                       mvc->comps[i].class0_fp_cdf[j]);
 #endif
     }
     write_mv_update(av1_mv_fp_tree, mvc->comps[i].fp, counts->comps[i].fp,
                     MV_FP_SIZE, w);
-#if CONFIG_DAALA_EC
+#if CONFIG_DAALA_EC || CONFIG_RANS
     av1_tree_to_cdf(av1_mv_fp_tree, mvc->comps[i].fp, mvc->comps[i].fp_cdf);
 #endif
   }
+#endif  // !CONFIG_EC_ADAPT || !(CONFIG_DAALA_EC || CONFIG_RANS)
 
   if (usehp) {
     for (i = 0; i < 2; ++i) {
@@ -255,12 +270,11 @@ void av1_write_nmv_probs(AV1_COMMON *cm, int usehp, aom_writer *w,
 }
 
 void av1_encode_mv(AV1_COMP *cpi, aom_writer *w, const MV *mv, const MV *ref,
-                   const nmv_context *mvctx, int usehp) {
+                   nmv_context *mvctx, int usehp) {
   const MV diff = { mv->row - ref->row, mv->col - ref->col };
   const MV_JOINT_TYPE j = av1_get_mv_joint(&diff);
-  usehp = usehp && av1_use_mv_hp(ref);
 
-#if CONFIG_DAALA_EC
+#if CONFIG_DAALA_EC || CONFIG_RANS
   aom_write_symbol(w, j, mvctx->joint_cdf, MV_JOINTS);
 #else
   av1_write_token(w, av1_mv_joint_tree, mvctx->joints, &mv_joint_encodings[j]);
@@ -303,7 +317,7 @@ static void inc_mvs(const MB_MODE_INFO *mbmi, const MB_MODE_INFO_EXT *mbmi_ext,
 #else
     nmv_context_counts *counts = nmv_counts;
 #endif
-    av1_inc_mv(&diff, counts, av1_use_mv_hp(ref));
+    av1_inc_mv(&diff, counts, 1);
   }
 }
 

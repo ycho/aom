@@ -235,6 +235,7 @@ static void encode_unsigned_max(struct aom_write_bit_buffer *wb, int data,
   aom_wb_write_literal(wb, data, get_unsigned_bits(max));
 }
 
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
 static void prob_diff_update(const aom_tree_index *tree,
                              aom_prob probs[/*n - 1*/],
                              const unsigned int counts[/*n - 1*/], int n,
@@ -267,6 +268,7 @@ static int prob_diff_update_savings(const aom_tree_index *tree,
   }
   return savings;
 }
+#endif
 
 static void write_selected_tx_size(const AV1_COMMON *cm, const MACROBLOCKD *xd,
                                    aom_writer *w) {
@@ -372,6 +374,7 @@ static void update_skip_probs(AV1_COMMON *cm, aom_writer *w,
   }
 }
 
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
 static void update_switchable_interp_probs(AV1_COMMON *cm, aom_writer *w,
                                            FRAME_COUNTS *counts) {
   int j;
@@ -443,6 +446,7 @@ static void update_ext_tx_probs(AV1_COMMON *cm, aom_writer *w) {
     }
   }
 }
+#endif
 
 #if CONFIG_PALETTE
 static void pack_palette_tokens(aom_writer *w, TOKENEXTRA **tp, int n,
@@ -564,8 +568,7 @@ static void pack_mb_tokens(aom_writer *w, TOKENEXTRA **tp,
 #endif
 
 static void write_segment_id(aom_writer *w, const struct segmentation *seg,
-                             const struct segmentation_probs *segp,
-                             int segment_id) {
+                             struct segmentation_probs *segp, int segment_id) {
   if (seg->enabled && seg->update_map) {
 #if CONFIG_DAALA_EC
     aom_write_symbol(w, segment_id, segp->tree_cdf, MAX_SEGMENTS);
@@ -761,7 +764,7 @@ static void pack_inter_mode_mvs(AV1_COMP *cpi, const MODE_INFO *mi,
                                 aom_writer *w) {
   AV1_COMMON *const cm = &cpi->common;
 #if !CONFIG_REF_MV
-  const nmv_context *nmvc = &cm->fc->nmvc;
+  nmv_context *nmvc = &cm->fc->nmvc;
 #endif
 
 #if CONFIG_DELTA_Q
@@ -772,7 +775,7 @@ static void pack_inter_mode_mvs(AV1_COMP *cpi, const MODE_INFO *mi,
   const MACROBLOCKD *const xd = &x->e_mbd;
 #endif
   const struct segmentation *const seg = &cm->seg;
-  const struct segmentation_probs *const segp = &cm->fc->seg;
+  struct segmentation_probs *const segp = &cm->fc->seg;
   const MB_MODE_INFO *const mbmi = &mi->mbmi;
   const MB_MODE_INFO_EXT *const mbmi_ext = x->mbmi_ext;
   const PREDICTION_MODE mode = mbmi->mode;
@@ -902,7 +905,7 @@ static void pack_inter_mode_mvs(AV1_COMP *cpi, const MODE_INFO *mi,
               int nmv_ctx = av1_nmv_ctx(mbmi_ext->ref_mv_count[rf_type],
                                         mbmi_ext->ref_mv_stack[rf_type], ref,
                                         mbmi->ref_mv_idx);
-              const nmv_context *nmvc = &cm->fc->nmvc[nmv_ctx];
+              nmv_context *nmvc = &cm->fc->nmvc[nmv_ctx];
 #endif
               av1_encode_mv(cpi, w, &mi->bmi[j].as_mv[ref].as_mv,
                             &mbmi_ext->ref_mvs[mbmi->ref_frame[ref]][0].as_mv,
@@ -920,7 +923,7 @@ static void pack_inter_mode_mvs(AV1_COMP *cpi, const MODE_INFO *mi,
           int nmv_ctx = av1_nmv_ctx(mbmi_ext->ref_mv_count[rf_type],
                                     mbmi_ext->ref_mv_stack[rf_type], ref,
                                     mbmi->ref_mv_idx);
-          const nmv_context *nmvc = &cm->fc->nmvc[nmv_ctx];
+          nmv_context *nmvc = &cm->fc->nmvc[nmv_ctx];
 #endif
           ref_mv = mbmi_ext->ref_mvs[mbmi->ref_frame[ref]][0];
           av1_encode_mv(cpi, w, &mbmi->mv[ref].as_mv, &ref_mv.as_mv, nmvc,
@@ -968,15 +971,15 @@ static void pack_inter_mode_mvs(AV1_COMP *cpi, const MODE_INFO *mi,
 }
 
 #if CONFIG_DELTA_Q
-static void write_mb_modes_kf(const AV1_COMMON *cm, MACROBLOCKD *xd,
+static void write_mb_modes_kf(AV1_COMMON *cm, MACROBLOCKD *xd,
                               MODE_INFO **mi_8x8, aom_writer *w) {
   int skip;
 #else
-static void write_mb_modes_kf(const AV1_COMMON *cm, const MACROBLOCKD *xd,
+static void write_mb_modes_kf(AV1_COMMON *cm, const MACROBLOCKD *xd,
                               MODE_INFO **mi_8x8, aom_writer *w) {
 #endif
   const struct segmentation *const seg = &cm->seg;
-  const struct segmentation_probs *const segp = &cm->fc->seg;
+  struct segmentation_probs *const segp = &cm->fc->seg;
   const MODE_INFO *const mi = mi_8x8[0];
   const MODE_INFO *const above_mi = xd->above_mi;
   const MODE_INFO *const left_mi = xd->left_mi;
@@ -1080,7 +1083,7 @@ static void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
                           aom_writer *w, TOKENEXTRA **tok,
                           const TOKENEXTRA *const tok_end, int mi_row,
                           int mi_col) {
-  const AV1_COMMON *const cm = &cpi->common;
+  AV1_COMMON *const cm = &cpi->common;
   MACROBLOCKD *const xd = &cpi->td.mb.e_mbd;
   MODE_INFO *m;
   int plane;
@@ -1324,6 +1327,37 @@ static void write_modes_sb(AV1_COMP *cpi, const TileInfo *const tile,
         DERING_REFINEMENT_BITS);
   }
 #endif
+
+#if CONFIG_CLPF
+  if (bsize == BLOCK_64X64 && cm->clpf_blocks && cm->clpf_strength_y &&
+      cm->clpf_size != CLPF_NOSIZE) {
+    const int tl = mi_row * MI_SIZE / MIN_FB_SIZE * cm->clpf_stride +
+                   mi_col * MI_SIZE / MIN_FB_SIZE;
+    const int tr = tl + 1;
+    const int bl = tl + cm->clpf_stride;
+    const int br = tr + cm->clpf_stride;
+
+    // Up to four bits per SB.
+    // When clpf_size indicates a size larger than the SB size
+    // (CLPF_128X128), one bit for every fourth SB will be transmitted
+    // regardless of skip blocks.
+    if (cm->clpf_blocks[tl] != CLPF_NOFLAG)
+      aom_write_literal(w, cm->clpf_blocks[tl], 1);
+
+    if (mi_col + MI_SIZE / 2 < cm->mi_cols &&
+        cm->clpf_blocks[tr] != CLPF_NOFLAG)
+      aom_write_literal(w, cm->clpf_blocks[tr], 1);
+
+    if (mi_row + MI_SIZE / 2 < cm->mi_rows &&
+        cm->clpf_blocks[bl] != CLPF_NOFLAG)
+      aom_write_literal(w, cm->clpf_blocks[bl], 1);
+
+    if (mi_row + MI_SIZE / 2 < cm->mi_rows &&
+        mi_col + MI_SIZE / 2 < cm->mi_cols &&
+        cm->clpf_blocks[br] != CLPF_NOFLAG)
+      aom_write_literal(w, cm->clpf_blocks[br], 1);
+  }
+#endif
 }
 
 static void write_modes(AV1_COMP *cpi, const TileInfo *const tile,
@@ -1391,7 +1425,11 @@ static void update_coef_probs_common(aom_writer *const bc, AV1_COMP *cpi,
                                      av1_coeff_probs_model *new_coef_probs) {
   av1_coeff_probs_model *old_coef_probs = cpi->common.fc->coef_probs[tx_size];
   const aom_prob upd = DIFF_UPDATE_PROB;
+#if CONFIG_EC_ADAPT
+  const int entropy_nodes_update = ONE_TOKEN;
+#else
   const int entropy_nodes_update = UNCONSTRAINED_NODES;
+#endif
   int i, j, k, l, t;
   int stepsize = cpi->sf.coeff_prob_appx_step;
 #if CONFIG_TILE_GROUPS
@@ -1597,18 +1635,6 @@ static void encode_clpf(const AV1_COMMON *cm, struct aom_write_bit_buffer *wb) {
   aom_wb_write_literal(wb, cm->clpf_strength_v, 2);
   if (cm->clpf_strength_y) {
     aom_wb_write_literal(wb, cm->clpf_size, 2);
-    if (cm->clpf_size) {
-      int i;
-      // TODO(stemidts): The number of bits to transmit could be
-      // implicitly deduced if transmitted after the filter block or
-      // after the frame (when it's known whether the block is all
-      // skip and implicitly unfiltered).  And the bits do not have
-      // 50% probability, so a more efficient coding is possible.
-      aom_wb_write_literal(wb, cm->clpf_numblocks, av1_clpf_maxbits(cm));
-      for (i = 0; i < cm->clpf_numblocks; i++) {
-        aom_wb_write_literal(wb, cm->clpf_blocks ? cm->clpf_blocks[i] : 0, 1);
-      }
-    }
   }
 }
 #endif
@@ -1695,6 +1721,7 @@ static void encode_segmentation(AV1_COMMON *cm, MACROBLOCKD *xd,
   }
 }
 
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
 static void update_seg_probs(AV1_COMP *cpi, aom_writer *w) {
   AV1_COMMON *cm = &cpi->common;
 #if CONFIG_TILE_GROUPS
@@ -1723,6 +1750,7 @@ static void update_seg_probs(AV1_COMP *cpi, aom_writer *w) {
                   cm->fc->seg.tree_cdf);
 #endif
 }
+#endif  // CONFIG_EC_ADAPT,CONFIG_DAALA_EC
 
 static void write_txfm_mode(TX_MODE mode, struct aom_write_bit_buffer *wb) {
   aom_wb_write_bit(wb, mode == TX_MODE_SELECT);
@@ -1919,14 +1947,16 @@ static size_t encode_tiles(AV1_COMP *cpi, uint8_t *data_ptr,
   for (tile_row = 0; tile_row < tile_rows; tile_row++) {
     for (tile_col = 0; tile_col < tile_cols; tile_col++) {
       const int tile_idx = tile_row * tile_cols + tile_col;
-      const int is_last_tile = tile_idx == tile_rows * tile_cols - 1;
       unsigned int tile_size;
 #if CONFIG_PVQ
       TileDataEnc *this_tile = &cpi->tile_data[tile_idx];
 #endif
       TOKENEXTRA *tok = cpi->tile_tok[tile_row][tile_col];
-
-#if CONFIG_TILE_GROUPS
+#if !CONFIG_TILE_GROUPS
+      const int is_last_tile = tile_idx == tile_rows * tile_cols - 1;
+#else
+      // All tiles in a tile group have a length
+      const int is_last_tile = 0;
       if (tile_count >= tg_size) {
         // Copy uncompressed header
         memcpy(data_ptr + total_size, data_ptr,
@@ -2227,12 +2257,12 @@ static void write_uncompressed_header(AV1_COMP *cpi,
   aom_wb_write_literal(wb, cm->frame_context_idx, FRAME_CONTEXTS_LOG2);
 
   encode_loopfilter(&cm->lf, wb);
-#if CONFIG_CLPF
-  encode_clpf(cm, wb);
-#endif
 #if CONFIG_DERING
   encode_dering(cm->dering_level, wb);
 #endif  // CONFIG_DERING
+#if CONFIG_CLPF
+  encode_clpf(cm, wb);
+#endif
   encode_quantization(cm, wb);
   encode_segmentation(cm, xd, wb);
 #if CONFIG_DELTA_Q
@@ -2277,6 +2307,7 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
   FRAME_COUNTS *counts = cpi->td.counts;
   aom_writer *header_bc;
   int i, j;
+
 #if CONFIG_TILE_GROUPS
   const int probwt = cm->num_tg;
 #else
@@ -2295,13 +2326,16 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
 #endif
 
   update_txfm_probs(cm, header_bc, counts);
+
 #if !CONFIG_PVQ
   update_coef_probs(cpi, header_bc);
 #endif
+
   update_skip_probs(cm, header_bc, counts);
 #if CONFIG_DELTA_Q
   update_delta_q_probs(cm, header_bc, counts);
 #endif
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
   update_seg_probs(cpi, header_bc);
 
   for (i = 0; i < INTRA_MODES; ++i) {
@@ -2321,12 +2355,15 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
                     cm->fc->partition_cdf[i]);
 #endif
   }
+#endif  // CONFIG_EC_ADAPT, CONFIG_DAALA_EC
 
   if (frame_is_intra_only(cm)) {
     av1_copy(cm->kf_y_prob, av1_kf_y_mode_prob);
 #if CONFIG_DAALA_EC
     av1_copy(cm->kf_y_cdf, av1_kf_y_mode_cdf);
 #endif
+
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
     for (i = 0; i < INTRA_MODES; ++i)
       for (j = 0; j < INTRA_MODES; ++j) {
         prob_diff_update(av1_intra_mode_tree, cm->kf_y_prob[i][j],
@@ -2337,7 +2374,9 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
                         cm->kf_y_cdf[i][j]);
 #endif
       }
+#endif  // CONFIG_EC_ADAPT, CONFIG_DAALA_EC
   } else {
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
 #if CONFIG_REF_MV
     update_inter_mode_probs(cm, header_bc, counts);
 #else
@@ -2350,6 +2389,7 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
 #endif
     }
 #endif
+#endif  // CONFIG_EC_ADAPT, CONFIG_DAALA_EC
 #if CONFIG_MOTION_VAR
     for (i = 0; i < BLOCK_SIZES; ++i)
       if (is_motion_variation_allowed_bsize(i))
@@ -2357,8 +2397,10 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
                          counts->motion_mode[i], MOTION_MODES, probwt,
                          header_bc);
 #endif  // CONFIG_MOTION_VAR
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
     if (cm->interp_filter == SWITCHABLE)
       update_switchable_interp_probs(cm, header_bc, counts);
+#endif
 
     for (i = 0; i < INTRA_INTER_CONTEXTS; i++)
       av1_cond_prob_diff_update(header_bc, &fc->intra_inter_prob[i],
@@ -2377,7 +2419,6 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
         for (j = 0; j < (SINGLE_REFS - 1); j++)
           av1_cond_prob_diff_update(header_bc, &fc->single_ref_prob[i][j],
                                     counts->single_ref[i][j], probwt);
-
     if (cm->reference_mode != SINGLE_REFERENCE)
 #if CONFIG_EXT_REFS
       for (i = 0; i < REF_CONTEXTS; i++) {
@@ -2394,6 +2435,7 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
                                   counts->comp_ref[i], probwt);
 #endif  // CONFIG_EXT_REFS
 
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
     for (i = 0; i < BLOCK_SIZE_GROUPS; ++i) {
       prob_diff_update(av1_intra_mode_tree, cm->fc->y_mode_prob[i],
                        counts->y_mode[i], INTRA_MODES, probwt, header_bc);
@@ -2402,6 +2444,7 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
                       cm->fc->y_mode_cdf[i]);
 #endif
     }
+#endif  // CONFIG_EC_ADAPT, CONFIG_DAALA_EC
 
     av1_write_nmv_probs(cm, cm->allow_high_precision_mv, header_bc,
 #if CONFIG_REF_MV
@@ -2409,11 +2452,9 @@ static size_t write_compressed_header(AV1_COMP *cpi, uint8_t *data) {
 #else
                         &counts->mv);
 #endif
-#if CONFIG_DAALA_EC
-    av1_tree_to_cdf(av1_mv_joint_tree, cm->fc->nmvc.joints,
-                    cm->fc->nmvc.joint_cdf);
-#endif
+#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
     update_ext_tx_probs(cm, header_bc);
+#endif
   }
 
 #if CONFIG_ANS
