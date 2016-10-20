@@ -253,7 +253,7 @@ static void update_mv_probs(aom_prob *p, int n, aom_reader *r) {
 static void read_mv_probs(nmv_context *ctx, int allow_hp, aom_reader *r) {
   int i;
 
-#if !CONFIG_EC_ADAPT || !CONFIG_DAALA_EC
+#if !CONFIG_EC_ADAPT || !(CONFIG_DAALA_EC || CONFIG_RANS)
   int j;
   update_mv_probs(ctx->joints, MV_JOINTS - 1, r);
 #if CONFIG_DAALA_EC || CONFIG_RANS
@@ -2130,12 +2130,13 @@ static size_t read_uncompressed_header(AV1Decoder *pbi,
       pbi->need_resync = 0;
     }
 #if CONFIG_PALETTE
-    if (frame_is_intra_only(cm))
-      cm->allow_screen_content_tools = aom_rb_read_bit(rb);
+    cm->allow_screen_content_tools = aom_rb_read_bit(rb);
 #endif  // CONFIG_PALETTE
   } else {
     cm->intra_only = cm->show_frame ? 0 : aom_rb_read_bit(rb);
-
+#if CONFIG_PALETTE
+    if (cm->intra_only) cm->allow_screen_content_tools = aom_rb_read_bit(rb);
+#endif  // CONFIG_PALETTE
     if (cm->error_resilient_mode) {
       cm->reset_frame_context = RESET_FRAME_CONTEXT_ALL;
     } else {
