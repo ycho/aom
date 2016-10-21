@@ -538,15 +538,15 @@ static int reconstruct_inter_block(AV1_COMMON *cm, MACROBLOCKD *const xd,
   int block_idx = (row << 1) + col;
   TX_TYPE tx_type = get_tx_type(plane_type, xd, block_idx);
 #if !CONFIG_PVQ
-    const SCAN_ORDER *scan_order = get_scan(cm, tx_size, tx_type);
-    const int eob = av1_decode_block_tokens(xd, plane, scan_order, col, row,
-                                            tx_size, r, mbmi->segment_id);
-  #if CONFIG_ADAPT_SCAN
-    av1_update_scan_count_facade(cm, tx_size, tx_type, pd->dqcoeff, eob);
-  #endif
-    inverse_transform_block(xd, plane, tx_type, tx_size,
-                            &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
-                            pd->dst.stride, eob);
+  const SCAN_ORDER *scan_order = get_scan(cm, tx_size, tx_type);
+  const int eob = av1_decode_block_tokens(xd, plane, scan_order, col, row,
+                                          tx_size, r, mbmi->segment_id);
+#if CONFIG_ADAPT_SCAN
+  av1_update_scan_count_facade(cm, tx_size, tx_type, pd->dqcoeff, eob);
+#endif
+  inverse_transform_block(xd, plane, tx_type, tx_size,
+                          &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
+                          pd->dst.stride, eob);
 #else
   int ac_dc_coded;
   int eob = 0;
@@ -606,8 +606,8 @@ static int reconstruct_inter_block(AV1_COMMON *cm, MACROBLOCKD *const xd,
       for (j = 0; j < tx_blk_size; j++)
         for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
 
-      inverse_transform_block(xd, plane, tx_type, tx_size, dst,
-                              pd->dst.stride, eob);
+      inverse_transform_block(xd, plane, tx_type, tx_size, dst, pd->dst.stride,
+                              eob);
     }
   }
 #endif

@@ -914,17 +914,17 @@ static void encode_block_pass1(int plane, int block, int blk_row, int blk_col,
 
 #if CONFIG_PVQ
     {
-    int tx_blk_size;
-    int i, j;
-    // transform block size in pixels
-    tx_blk_size = 1 << (tx_size + 2);
+      int tx_blk_size;
+      int i, j;
+      // transform block size in pixels
+      tx_blk_size = 1 << (tx_size + 2);
 
-    // Since av1 does not have separate function which does inverse transform
-    // but av1_inv_txfm_add_*x*() also does addition of predicted image to
-    // inverse transformed image,
-    // pass blank dummy image to av1_inv_txfm_add_*x*(), i.e. set dst as zeros
-    for (j = 0; j < tx_blk_size; j++)
-      for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
+      // Since av1 does not have separate function which does inverse transform
+      // but av1_inv_txfm_add_*x*() also does addition of predicted image to
+      // inverse transformed image,
+      // pass blank dummy image to av1_inv_txfm_add_*x*(), i.e. set dst as zeros
+      for (j = 0; j < tx_blk_size; j++)
+        for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
     }
 #endif
 
