@@ -59,9 +59,7 @@
 #define MAX_AV1_HEADER_SIZE 80
 #define ACCT_STR __func__
 
-#if !CONFIG_PVQ
-#include "av1/decoder/detokenize.h"
-#else
+#if CONFIG_PVQ
 #include "av1/decoder/pvq_decoder.h"
 #include "av1/encoder/encodemb.h"
 
