@@ -785,12 +785,6 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
 #if CONFIG_PVQ
   int tx_blk_size;
   int i, j;
-  PVQ_INFO *pvq_info = NULL;
-
-  if (x->pvq_coded) {
-    assert(block < 256);
-    pvq_info = &x->pvq[block][plane];
-  }
 #endif
   dst = &pd->dst.buf[4 * blk_row * pd->dst.stride + 4 * blk_col];
   a = &ctx->ta[plane][blk_col];

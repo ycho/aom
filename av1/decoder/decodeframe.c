@@ -448,6 +448,7 @@ static void predict_and_reconstruct_intra_block(
   uint8_t *dst;
   int block_idx = (row << 1) + col;
 #if CONFIG_PVQ
+  (void)cm;
   (void)r;
 #endif
   dst = &pd->dst.buf[4 * row * pd->dst.stride + 4 * col];
@@ -551,6 +552,7 @@ static int reconstruct_inter_block(AV1_COMMON *cm, MACROBLOCKD *const xd,
   int ac_dc_coded;
   int eob = 0;
 
+  (void)cm;
   (void)r;
 
   // pvq_decode() for inter block runs here.

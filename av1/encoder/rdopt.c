@@ -1031,7 +1031,9 @@ static int64_t rd_pick_intra4x4block(const AV1_COMP *const cpi, MACROBLOCK *x,
                                      ENTROPY_CONTEXT *l, int *bestrate,
                                      int *bestratey, int64_t *bestdistortion,
                                      BLOCK_SIZE bsize, int64_t rd_thresh) {
+#if !CONFIG_PVQ
   const AV1_COMMON *const cm = &cpi->common;
+#endif
   PREDICTION_MODE mode;
   MACROBLOCKD *const xd = &x->e_mbd;
   int64_t best_rd = rd_thresh;
@@ -2359,7 +2361,9 @@ static int64_t encode_inter_mb_segment(const AV1_COMP *const cpi, MACROBLOCK *x,
                                        int64_t *sse, ENTROPY_CONTEXT *ta,
                                        ENTROPY_CONTEXT *tl, int ir, int ic,
                                        int mi_row, int mi_col) {
+#if !CONFIG_PVQ
   const AV1_COMMON *const cm = &cpi->common;
+#endif
   int k;
   MACROBLOCKD *xd = &x->e_mbd;
   struct macroblockd_plane *const pd = &xd->plane[0];
