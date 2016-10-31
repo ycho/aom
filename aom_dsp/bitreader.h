@@ -17,6 +17,10 @@
 
 #include "./aom_config.h"
 
+#if CONFIG_EC_ADAPT && !CONFIG_EC_MULTISYMBOL
+# error "CONFIG_EC_ADAPT is enabled without enabling CONFIG_EC_MULTISYMBOL."
+#endif
+
 #if CONFIG_BITSTREAM_DEBUG
 #include <assert.h>
 #include <stdio.h>
@@ -232,22 +236,22 @@ static INLINE int aom_read_tree_(aom_reader *r, const aom_tree_index *tree,
   return ret;
 }
 
+#if CONFIG_EC_MULTISYMBOL
 static INLINE int aom_read_symbol_(aom_reader *r, aom_cdf_prob *cdf,
                                    int nsymbs ACCT_STR_PARAM) {
   int ret;
-#if CONFIG_RANS
+#if CONFIG_ANS
   (void)nsymbs;
   ret = rans_read(r, cdf);
 #elif CONFIG_DAALA_EC
   ret = daala_read_symbol(r, cdf, nsymbs);
 #else
-  (void)r;
-  (void)cdf;
-  (void)nsymbs;
-  assert(0 && "Unsupported bitreader operation");
-  ret = -1;
+#error \
+    "CONFIG_EC_MULTISYMBOL is selected without a valid backing entropy " \
+  "coder. Enable daala_ec or ans for a valid configuration."
 #endif
-#if ((CONFIG_RANS || CONFIG_DAALA_EC) && CONFIG_EC_ADAPT)
+
+#if CONFIG_EC_ADAPT
   update_cdf(cdf, ret, nsymbs);
 #endif
 
@@ -256,6 +260,7 @@ static INLINE int aom_read_symbol_(aom_reader *r, aom_cdf_prob *cdf,
 #endif
   return ret;
 }
+#endif  // CONFIG_EC_MULTISYMBOL
 
 #ifdef __cplusplus
 }  // extern "C"

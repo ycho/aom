@@ -15,6 +15,10 @@
 #include <assert.h>
 #include "./aom_config.h"
 
+#if CONFIG_EC_ADAPT && !CONFIG_EC_MULTISYMBOL
+# error "CONFIG_EC_ADAPT is enabled without enabling CONFIG_EC_MULTISYMBOL"
+#endif
+
 #if CONFIG_BITSTREAM_DEBUG
 #include <stdio.h>
 #include "aom_util/debug_util.h"
@@ -115,9 +119,10 @@ static INLINE void aom_write_tree(aom_writer *w, const aom_tree_index *tree,
 #endif
 }
 
+#if CONFIG_EC_MULTISYMBOL
 static INLINE void aom_write_symbol(aom_writer *w, int symb, aom_cdf_prob *cdf,
                                     int nsymbs) {
-#if CONFIG_RANS
+#if CONFIG_ANS
   struct rans_sym s;
   (void)nsymbs;
   assert(cdf);
@@ -127,17 +132,16 @@ static INLINE void aom_write_symbol(aom_writer *w, int symb, aom_cdf_prob *cdf,
 #elif CONFIG_DAALA_EC
   daala_write_symbol(w, symb, cdf, nsymbs);
 #else
-  (void)w;
-  (void)symb;
-  (void)cdf;
-  (void)nsymbs;
-  assert(0 && "Unsupported bitwriter operation");
+#error \
+    "CONFIG_EC_MULTISYMBOL is selected without a valid backing entropy " \
+  "coder. Enable daala_ec or ans for a valid configuration."
 #endif
 
-#if ((CONFIG_RANS || CONFIG_DAALA_EC) && CONFIG_EC_ADAPT)
+#if CONFIG_EC_ADAPT
   update_cdf(cdf, symb, nsymbs);
 #endif
 }
+#endif  // CONFIG_EC_MULTISYMBOL
 
 #ifdef __cplusplus
 }  // extern "C"

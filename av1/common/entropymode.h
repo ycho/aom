@@ -68,9 +68,9 @@ typedef struct frame_contexts {
   aom_prob uv_mode_prob[INTRA_MODES][INTRA_MODES - 1];
   aom_prob partition_prob[PARTITION_CONTEXTS][PARTITION_TYPES - 1];
   av1_coeff_probs_model coef_probs[TX_SIZES][PLANE_TYPES];
-#if CONFIG_RANS || CONFIG_DAALA_EC
+#if CONFIG_EC_MULTISYMBOL
   coeff_cdf_model coef_cdfs[TX_SIZES][PLANE_TYPES];
-#endif  // CONFIG_RANS
+#endif  // CONFIG_EC_MULTISYMBOL
   aom_prob switchable_interp_prob[SWITCHABLE_FILTER_CONTEXTS]
                                  [SWITCHABLE_FILTERS - 1];
 
@@ -245,6 +245,8 @@ extern const aom_tree_index av1_palette_color_tree[PALETTE_MAX_SIZE - 1]
 #if CONFIG_DAALA_EC
 extern int av1_switchable_interp_ind[SWITCHABLE_FILTERS];
 extern int av1_switchable_interp_inv[SWITCHABLE_FILTERS];
+
+void av1_set_mode_cdfs(struct AV1Common *cm);
 #endif
 
 void av1_setup_past_independence(struct AV1Common *cm);

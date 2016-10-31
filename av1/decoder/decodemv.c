@@ -540,7 +540,6 @@ static void read_intra_frame_mode_info(AV1_COMMON *const cm,
 #if CONFIG_EXT_INTRA
   read_intra_angle_info(mbmi, r);
 #endif  // CONFIG_EXT_INTRA
-
 #if CONFIG_PALETTE
   mbmi->palette_mode_info.palette_size[0] = 0;
   mbmi->palette_mode_info.palette_size[1] = 0;
@@ -572,7 +571,7 @@ static int read_mv_component(aom_reader *r, nmv_component *mvcomp, int usehp) {
   int mag, d, fr, hp;
   const int sign = aom_read(r, mvcomp->sign, ACCT_STR);
   const int mv_class =
-#if CONFIG_DAALA_EC || CONFIG_RANS
+#if CONFIG_EC_MULTISYMBOL
       aom_read_symbol(r, mvcomp->class_cdf, MV_CLASSES, ACCT_STR);
 #else
       aom_read_tree(r, av1_mv_class_tree, mvcomp->classes, ACCT_STR);
@@ -593,7 +592,7 @@ static int read_mv_component(aom_reader *r, nmv_component *mvcomp, int usehp) {
   }
 
 // Fractional part
-#if CONFIG_DAALA_EC || CONFIG_RANS
+#if CONFIG_EC_MULTISYMBOL
   fr = aom_read_symbol(r, class0 ? mvcomp->class0_fp_cdf[d] : mvcomp->fp_cdf,
                        MV_FP_SIZE, ACCT_STR);
 #else
@@ -614,7 +613,7 @@ static INLINE void read_mv(aom_reader *r, MV *mv, const MV *ref,
                            nmv_context *ctx, nmv_context_counts *counts,
                            int allow_hp) {
   const MV_JOINT_TYPE joint_type =
-#if CONFIG_DAALA_EC || CONFIG_RANS
+#if CONFIG_EC_MULTISYMBOL
       (MV_JOINT_TYPE)aom_read_symbol(r, ctx->joint_cdf, MV_JOINTS, ACCT_STR);
 #else
       (MV_JOINT_TYPE)aom_read_tree(r, av1_mv_joint_tree, ctx->joints, ACCT_STR);
@@ -806,16 +805,15 @@ static void read_intra_block_mode_info(AV1_COMMON *const cm,
   }
 
   mbmi->uv_mode = read_intra_mode_uv(cm, xd, r, mbmi->mode);
+#if CONFIG_EXT_INTRA
+  read_intra_angle_info(mbmi, r);
+#endif  // CONFIG_EXT_INTRA
 #if CONFIG_PALETTE
   mbmi->palette_mode_info.palette_size[0] = 0;
   mbmi->palette_mode_info.palette_size[1] = 0;
   if (bsize >= BLOCK_8X8 && cm->allow_screen_content_tools)
     read_palette_mode_info(cm, xd, r);
 #endif  // CONFIG_PALETTE
-
-#if CONFIG_EXT_INTRA
-  read_intra_angle_info(mbmi, r);
-#endif  // CONFIG_EXT_INTRA
 }
 
 static INLINE int is_mv_valid(const MV *mv) {

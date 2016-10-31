@@ -43,21 +43,21 @@ const aom_tree_index av1_mv_fp_tree[TREE_SIZE(MV_FP_SIZE)] = { -0, 2,  -1,
 
 static const nmv_context default_nmv_context = {
   { 32, 64, 96 },  // joints
-#if CONFIG_DAALA_EC || CONFIG_RANS
+#if CONFIG_EC_MULTISYMBOL
   { 0, 0, 0, 0 },  // joint_cdf is computed from joints in av1_init_mv_probs()
 #endif
   { {
         // Vertical component
         128,                                                   // sign
         { 224, 144, 192, 168, 192, 176, 192, 198, 198, 245 },  // class
-#if CONFIG_DAALA_EC || CONFIG_RANS
+#if CONFIG_EC_MULTISYMBOL
         { 0 },  // class_cdf is computed from class in av1_init_mv_probs()
 #endif
         { 216 },                                               // class0
         { 136, 140, 148, 160, 176, 192, 224, 234, 234, 240 },  // bits
         { { 128, 128, 64 }, { 96, 112, 64 } },                 // class0_fp
         { 64, 96, 64 },                                        // fp
-#if CONFIG_DAALA_EC || CONFIG_RANS
+#if CONFIG_EC_MULTISYMBOL
         { { 0 }, { 0 } },  // class0_fp_cdf is computed in av1_init_mv_probs()
         { 0 },             // fp_cdf is computed from fp in av1_init_mv_probs()
 #endif
@@ -68,14 +68,14 @@ static const nmv_context default_nmv_context = {
         // Horizontal component
         128,                                                   // sign
         { 216, 128, 176, 160, 176, 176, 192, 198, 198, 208 },  // class
-#if CONFIG_DAALA_EC || CONFIG_RANS
+#if CONFIG_EC_MULTISYMBOL
         { 0 },  // class_cdf is computed from class in av1_init_mv_probs()
 #endif
         { 208 },                                               // class0
         { 136, 140, 148, 160, 176, 192, 224, 234, 234, 240 },  // bits
         { { 128, 128, 64 }, { 96, 112, 64 } },                 // class0_fp
         { 64, 96, 64 },                                        // fp
-#if CONFIG_DAALA_EC || CONFIG_RANS
+#if CONFIG_EC_MULTISYMBOL
         { { 0 }, { 0 } },  // class0_fp_cdf is computed in av1_init_mv_probs()
         { 0 },             // fp_cdf is computed from fp in av1_init_mv_probs()
 #endif
@@ -256,28 +256,33 @@ void av1_adapt_mv_probs(AV1_COMMON *cm, int allow_hp) {
 #endif
 }
 
+#if CONFIG_EC_MULTISYMBOL
+void av1_set_mv_cdfs(nmv_context *ctx) {
+  int i;
+  int j;
+  av1_tree_to_cdf(av1_mv_joint_tree, ctx->joints, ctx->joint_cdf);
+
+  for (i = 0; i < 2; ++i) {
+    nmv_component *const comp_ctx = &ctx->comps[i];
+    av1_tree_to_cdf(av1_mv_class_tree, comp_ctx->classes, comp_ctx->class_cdf);
+
+    for (j = 0; j < CLASS0_SIZE; ++j) {
+      av1_tree_to_cdf(av1_mv_fp_tree, comp_ctx->class0_fp[j],
+                      comp_ctx->class0_fp_cdf[j]);
+    }
+    av1_tree_to_cdf(av1_mv_fp_tree, comp_ctx->fp, comp_ctx->fp_cdf);
+  }
+}
+#endif
+
 void av1_init_mv_probs(AV1_COMMON *cm) {
 #if CONFIG_REF_MV
   int i;
   for (i = 0; i < NMV_CONTEXTS; ++i) cm->fc->nmvc[i] = default_nmv_context;
 #else
   cm->fc->nmvc = default_nmv_context;
-#if CONFIG_DAALA_EC || CONFIG_RANS
-  {
-    int i, j;
-    av1_tree_to_cdf(av1_mv_joint_tree, cm->fc->nmvc.joints,
-                    cm->fc->nmvc.joint_cdf);
-    for (i = 0; i < 2; i++) {
-      av1_tree_to_cdf(av1_mv_class_tree, cm->fc->nmvc.comps[i].classes,
-                      cm->fc->nmvc.comps[i].class_cdf);
-      av1_tree_to_cdf(av1_mv_fp_tree, cm->fc->nmvc.comps[i].fp,
-                      cm->fc->nmvc.comps[i].fp_cdf);
-      for (j = 0; j < CLASS0_SIZE; j++) {
-        av1_tree_to_cdf(av1_mv_fp_tree, cm->fc->nmvc.comps[i].class0_fp[j],
-                        cm->fc->nmvc.comps[i].class0_fp_cdf[j]);
-      }
-    }
-  }
+#if CONFIG_EC_MULTISYMBOL
+  av1_set_mv_cdfs(&cm->fc->nmvc);
 #endif
 #endif
 }
