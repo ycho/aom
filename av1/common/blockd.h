@@ -258,7 +258,7 @@ struct macroblockd_plane {
 #endif
 
 #if CONFIG_PVQ
-  DECLARE_ALIGNED(16, int16_t, pred[64 * 64]);
+  DECLARE_ALIGNED(16, int16_t, pred[MAX_SB_SQUARE]);
   // PVQ: forward transformed predicted image, a reference for PVQ.
   tran_low_t *pvq_ref_coeff;
 #endif

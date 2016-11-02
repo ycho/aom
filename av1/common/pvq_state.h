@@ -20,7 +20,6 @@ typedef struct od_adapt_ctx od_adapt_ctx;
 # include "generic_code.h"
 # include "odintrin.h"
 # include "pvq.h"
-# include <stdio.h>
 
 /*Adaptation speed of scalar Laplace encoding.*/
 # define OD_SCALAR_ADAPT_SPEED (4)
@@ -41,7 +40,11 @@ struct od_adapt_ctx {
 
 struct od_state {
   od_adapt_ctx adapt;
-  //unsigned char pvq_qm_q4[OD_NPLANES_MAX][OD_QM_SIZE];
+  /* TODO(yushin): Enable this for activity masking,
+     when pvq_qm_q4 is available in AOM. */
+  /* unsigned char pvq_qm_q4[OD_NPLANES_MAX][OD_QM_SIZE]; */
+
+  /* Quantization matrices and their inverses. */
   int16_t *qm;
   int16_t *qm_inv;
 };

@@ -1267,6 +1267,7 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
   //  quant * daala_enc->state.pvq_qm_q4[plane][od_qm_get_index(tx_size, 0)] >>
   //  4);
   int quant_shift = tx_size == TX_32X32 ? 1 : 0;
+  // DC quantizer for PVQ
   int pvq_dc_quant = OD_MAXI(1, quant[0] >> quant_shift);
   int tell;
   int has_dc_skip = 1;
@@ -1275,13 +1276,13 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
 #if PVQ_CHROMA_RD
   double save_pvq_lambda;
 #endif
-  DECLARE_ALIGNED(16, int16_t, coeff_pvq[64 * 64]);
-  DECLARE_ALIGNED(16, int16_t, ref_coeff_pvq[64 * 64]);
-  DECLARE_ALIGNED(16, int16_t, dqcoeff_pvq[64 * 64]);
+  DECLARE_ALIGNED(16, int16_t, coeff_pvq[OD_BSIZE_MAX * OD_BSIZE_MAX]);
+  DECLARE_ALIGNED(16, int16_t, ref_coeff_pvq[OD_BSIZE_MAX * OD_BSIZE_MAX]);
+  DECLARE_ALIGNED(16, int16_t, dqcoeff_pvq[OD_BSIZE_MAX * OD_BSIZE_MAX]);
 
-  DECLARE_ALIGNED(16, int32_t, in_int32[64 * 64]);
-  DECLARE_ALIGNED(16, int32_t, ref_int32[64 * 64]);
-  DECLARE_ALIGNED(16, int32_t, out_int32[64 * 64]);
+  DECLARE_ALIGNED(16, int32_t, in_int32[OD_BSIZE_MAX * OD_BSIZE_MAX]);
+  DECLARE_ALIGNED(16, int32_t, ref_int32[OD_BSIZE_MAX * OD_BSIZE_MAX]);
+  DECLARE_ALIGNED(16, int32_t, out_int32[OD_BSIZE_MAX * OD_BSIZE_MAX]);
 
   *eob = 0;
 
@@ -1318,7 +1319,7 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
       // TODO(yushin): Instead of 0,
       //   use daala_enc->use_activity_masking for activity masking.
       plane, tx_size, OD_PVQ_BETA[0][plane][tx_size],
-      1,        // OD_ROBUST_STREAM
+      OD_ROBUST_STREAM,
       0,        // is_keyframe,
       0, 0, 0,  // q_scaling, bx, by,
       daala_enc->state.qm + off, daala_enc->state.qm_inv + off,
@@ -1349,10 +1350,6 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
 
   // copy int32 result back to int16
   for (i = 0; i < tx_blk_size * tx_blk_size; i++) dqcoeff_pvq[i] = out_int32[i];
-
-  // Safely initialize dqcoeff since some coeffs (band size > 128 coeffs)
-  // are skipped by PVQ.
-  // od_init_skipped_coeffs(dqcoeff, ref_coeff, 0, 0, tx_blk_size, tx_blk_size);
 
   // Back to original coefficient order
   od_coding_order_to_raster(dqcoeff, tx_blk_size, tx_type, dqcoeff_pvq,

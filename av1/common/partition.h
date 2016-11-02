@@ -14,6 +14,7 @@
 #if !defined(_partition_H)
 # define _partition_H
 
+#include "av1/common/enums.h"
 #include "odintrin.h"
 
 typedef unsigned char index_pair[2];

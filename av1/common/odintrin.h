@@ -37,7 +37,7 @@ extern "C" {
 
 /*Smallest blocks are 4x4*/
 #define OD_LOG_BSIZE0 (2)
-/*There are 5 block sizes total (4x4, 8x8, 16x16, 32x32 and 64x64).*/
+/*There are 5 block sizes total (4x4, 8x8, 16x16 and 32x32).*/
 #define OD_NBSIZES (4)
 /*The log of the maximum length of the side of a block.*/
 #define OD_LOG_BSIZE_MAX (OD_LOG_BSIZE0 + OD_NBSIZES - 1)
@@ -45,7 +45,7 @@ extern "C" {
 #define OD_BSIZE_MAX (1 << OD_LOG_BSIZE_MAX)
 
 /**The maximum number of color planes allowed in a single frame.*/
-# define OD_NPLANES_MAX (4)
+# define OD_NPLANES_MAX (3)
 
 # define OD_COEFF_SHIFT (4)
 
@@ -66,6 +66,8 @@ extern "C" {
 
 # define OD_LIMIT_BSIZE_MIN (OD_BLOCK_4X4)
 # define OD_LIMIT_BSIZE_MAX (OD_BLOCK_32X32)
+
+# define OD_ROBUST_STREAM (1)
 
 typedef int od_coeff;
 
