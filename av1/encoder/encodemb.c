@@ -395,7 +395,7 @@ void av1_xform_quant_fp(const AV1_COMMON *const cm, MACROBLOCK *x, int plane,
   (void)qcoeff;
 
   if (x->pvq_coded) {
-    assert(block < 256);
+    assert(block < MAX_PVQ_BLOCKS_IN_SB);
     pvq_info = &x->pvq[block][plane];
   }
   dst = &pd->dst.buf[4 * (blk_row * dst_stride + blk_col)];
@@ -403,7 +403,7 @@ void av1_xform_quant_fp(const AV1_COMMON *const cm, MACROBLOCK *x, int plane,
   src_int16 = &p->src_int16[4 * (blk_row * diff_stride + blk_col)];
   pred = &pd->pred[4 * (blk_row * diff_stride + blk_col)];
   // transform block size in pixels
-  tx_blk_size = 1 << (tx_size + 2);
+  tx_blk_size = tx_size_1d[tx_size];
 
   // copy uint8 orig and predicted block to int16 buffer
   // in order to use existing VP10 transform functions
@@ -621,7 +621,7 @@ void av1_xform_quant(const AV1_COMMON *const cm, MACROBLOCK *x, int plane,
   (void)qcoeff;
 
   if (x->pvq_coded) {
-    assert(block < 256);
+    assert(block < MAX_PVQ_BLOCKS_IN_SB);
     pvq_info = &x->pvq[block][plane];
   }
   dst = &pd->dst.buf[4 * (blk_row * dst_stride + blk_col)];
@@ -630,7 +630,7 @@ void av1_xform_quant(const AV1_COMMON *const cm, MACROBLOCK *x, int plane,
   pred = &pd->pred[4 * (blk_row * diff_stride + blk_col)];
 
   // transform block size in pixels
-  tx_blk_size = 1 << (tx_size + 2);
+  tx_blk_size = tx_size_1d[tx_size];
 
   // copy uint8 orig and predicted block to int16 buffer
   // in order to use existing VP10 transform functions
@@ -817,7 +817,7 @@ static void encode_block(int plane, int block, int blk_row, int blk_col,
   if (x->pvq_skip[plane]) return;
 
   // transform block size in pixels
-  tx_blk_size = 1 << (tx_size + 2);
+  tx_blk_size = tx_size_1d[tx_size];
 
   // Since av1 does not have separate function which does inverse transform
   // but av1_inv_txfm_add_*x*() also does addition of predicted image to
@@ -911,7 +911,7 @@ static void encode_block_pass1(int plane, int block, int blk_row, int blk_col,
       int tx_blk_size;
       int i, j;
       // transform block size in pixels
-      tx_blk_size = 1 << (tx_size + 2);
+      tx_blk_size = tx_size_1d[tx_size];
 
       // Since av1 does not have separate function which does inverse transform
       // but av1_inv_txfm_add_*x*() also does addition of predicted image to
@@ -1023,7 +1023,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   (void)qcoeff;
 
   if (x->pvq_coded) {
-    assert(block < 256);
+    assert(block < MAX_PVQ_BLOCKS_IN_SB);
     pvq_info = &x->pvq[block][plane];
   }
   src_int16 = &p->src_int16[4 * (blk_row * diff_stride + blk_col)];
@@ -1173,7 +1173,7 @@ void av1_encode_block_intra(int plane, int block, int blk_row, int blk_col,
   }
 #else   // #if !CONFIG_PVQ
   // transform block size in pixels
-  tx_blk_size = 1 << (tx_size + 2);
+  tx_blk_size = tx_size_1d[tx_size];
 
   // copy uint8 orig and predicted block to int16 buffer
   // in order to use existing VP10 transform functions
@@ -1260,7 +1260,7 @@ int av1_pvq_encode_helper(daala_enc_ctx *daala_enc, tran_low_t *const coeff,
                           uint16_t *eob, const int16_t *quant, int plane,
                           int tx_size, TX_TYPE tx_type, int *rate, int speed,
                           PVQ_INFO *pvq_info) {
-  const int tx_blk_size = 1 << (tx_size + 2);
+  const int tx_blk_size = tx_size_1d[tx_size];
   int skip;
   // TODO(yushin): Enable this later, when pvq_qm_q4 is available in AOM.
   // int pvq_dc_quant = OD_MAXI(1,
@@ -1372,7 +1372,7 @@ void av1_store_pvq_enc_info(PVQ_INFO *pvq_info, int *qg, int *theta,
                             int skip_dir,
                             int bs) {  // block size in log_2 -2
   int i;
-  const int tx_blk_size = 1 << (bs + 2);
+  const int tx_blk_size = tx_size_1d[bs];
 
   for (i = 0; i < nb_bands; i++) {
     pvq_info->qg[i] = qg[i];

@@ -549,7 +549,7 @@ static void tokenize_pvq(int plane, int block, int blk_row, int blk_col,
   (void)plane_bsize;
   (void)tx_size;
 
-  assert(block < 256);
+  assert(block < MAX_PVQ_BLOCKS_IN_SB);
   pvq_info = &x->pvq[block][plane];
   add_pvq_block(x, pvq_info);
 }

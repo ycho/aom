@@ -535,6 +535,8 @@ void av1_first_pass(AV1_COMP *cpi, const struct lookahead_entry *source) {
 
     x->pvq_q = &pvq_q;
 
+    // TODO(yushin): Since this init step is also called in 2nd pass,
+    // or 1-pass encoding, consider factoring out it as a function.
     // TODO(yushin)
     // If activity masking is enabled, change below to OD_HVS_QM
     x->daala_enc.qm = OD_FLAT_QM;  // Hard coded. Enc/dec required to sync.

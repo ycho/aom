@@ -15,6 +15,9 @@
 # include "config.h"
 #endif
 
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "aom_dsp/entcode.h"
 #include "aom_dsp/entenc.h"
 #include "av1/common/blockd.h"
@@ -23,9 +26,6 @@
 #include "av1/common/pvq_state.h"
 #include "av1/encoder/encodemb.h"
 #include "pvq_encoder.h"
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #define OD_PVQ_RATE_APPROX (0)
 /*Shift to ensure that the upper bound (i.e. for the max blocksize) of the

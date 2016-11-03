@@ -318,7 +318,7 @@ static void model_rd_for_sb(const AV1_COMP *const cpi, BLOCK_SIZE bsize,
 int64_t av1_block_error2_c(const tran_low_t *coeff, const tran_low_t *dqcoeff,
                            const tran_low_t *ref, intptr_t block_size,
                            int64_t *ssz) {
-  int64_t error = 0;
+  int64_t error;
 
   // Use the existing sse codes for calculating distortion of decoded signal:
   // i.e. (orig - decoded)^2
@@ -762,6 +762,7 @@ static void choose_tx_size_from_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_REF_MV
     if (mbmi->ref_mv_idx > 0 && tx_type != DCT_DCT) continue;
 #endif
+
     last_rd = INT64_MAX;
     for (n = start_tx; n >= end_tx; --n) {
       int r_tx_size = 0;
@@ -776,7 +777,6 @@ static void choose_tx_size_from_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
         continue;
       }
       mbmi->tx_type = tx_type;
-
       txfm_rd_in_plane(cm, x, &r, &d, &s, &sse, ref_best_rd, 0, bs, n,
                        cpi->sf.use_fast_coef_costing);
 #if CONFIG_PVQ
@@ -1293,7 +1293,7 @@ static int64_t rd_pick_intra4x4block(const AV1_COMP *const cpi, MACROBLOCK *x,
 #endif
         }
       }
-    }  // for (idy =
+    }  // idy loop
 
     rate += ratey;
     this_rd = RDCOST(x->rdmult, x->rddiv, rate, distortion);
@@ -1317,7 +1317,7 @@ static int64_t rd_pick_intra4x4block(const AV1_COMP *const cpi, MACROBLOCK *x,
 #if CONFIG_PVQ
     od_encode_rollback(&x->daala_enc, &pre_buf);
 #endif
-  }  // for (mode =
+  }  // mode decision loop
 
   if (best_rd >= rd_thresh) return best_rd;
 
@@ -1748,6 +1748,7 @@ static int64_t rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     super_block_yrd(cpi, x, &this_rate_tokenonly, &this_distortion, &s, NULL,
                     bsize, best_rd);
 #endif  // CONFIG_EXT_INTRA
+
     if (this_rate_tokenonly == INT_MAX) continue;
 
     this_rate = this_rate_tokenonly + bmode_costs[mode];

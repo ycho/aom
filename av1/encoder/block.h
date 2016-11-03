@@ -25,6 +25,12 @@
 extern "C" {
 #endif
 
+#if CONFIG_PVQ
+// Maximum possible # of tx blocks in luma plane, which is currently 256,
+// since there can be 16x16 of 4x4 tx.
+#define MAX_PVQ_BLOCKS_IN_SB (MAX_SB_SQUARE >> 2 * OD_LOG_BSIZE0)
+#endif
+
 typedef struct {
   unsigned int sse;
   int sum;
@@ -172,7 +178,7 @@ struct macroblock {
   // 3) AV1 allows using smaller tx size than block (i.e. partition) size
   // TODO(yushin) : The memory usage could be improved a lot, since this has
   // storage for 10 bands and 128 coefficients for every 4x4 block,
-  PVQ_INFO pvq[MAX_SB_SQUARE >> 2 * OD_LOG_BSIZE0][MAX_MB_PLANE];
+  PVQ_INFO pvq[MAX_PVQ_BLOCKS_IN_SB][MAX_MB_PLANE];
   daala_enc_ctx daala_enc;
   int pvq_speed;
   int pvq_coded;  // Indicates whether pvq_info needs be stored to tokenize
