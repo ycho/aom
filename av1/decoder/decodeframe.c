@@ -406,7 +406,6 @@ static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
 
   return eob;
 }
-#endif
 
 static int av1_pvq_decode_helper2(
     MACROBLOCKD *const xd, MB_MODE_INFO *const mbmi, int plane, int row,
@@ -471,6 +470,7 @@ static int av1_pvq_decode_helper2(
 
   return eob;
 }
+#endif
 
 static void predict_and_reconstruct_intra_block(
     AV1_COMMON *cm, MACROBLOCKD *const xd, aom_reader *r,
