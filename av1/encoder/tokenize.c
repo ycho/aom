@@ -523,13 +523,14 @@ int av1_has_high_freq_in_plane(MACROBLOCK *x, BLOCK_SIZE bsize, int plane) {
 }
 
 #if CONFIG_PVQ
-void add_pvq_block(MACROBLOCK *const x, PVQ_INFO *pvq) {
+void add_pvq_block(AV1_COMMON *const cm, MACROBLOCK *const x, PVQ_INFO *pvq) {
   PVQ_QUEUE *q = x->pvq_q;
   if (q->curr_pos >= q->buf_len) {
-    q->buf_len *= 2;
-    q->buf = aom_realloc(q->buf, q->buf_len * sizeof(PVQ_INFO));
+    q->buf_len = 2 * q->buf_len + 1;
+    CHECK_MEM_ERROR(cm, q->buf, aom_realloc(q->buf, q->buf_len * sizeof(PVQ_INFO)));
   }
-  memcpy(q->buf + q->curr_pos, pvq, sizeof(PVQ_INFO));
+  //memcpy(q->buf + q->curr_pos, pvq, sizeof(PVQ_INFO));
+  OD_COPY(q->buf + q->curr_pos, pvq, 1);
   ++q->curr_pos;
 }
 
@@ -539,6 +540,8 @@ void add_pvq_block(MACROBLOCK *const x, PVQ_INFO *pvq) {
 static void tokenize_pvq(int plane, int block, int blk_row, int blk_col,
                          BLOCK_SIZE plane_bsize, TX_SIZE tx_size, void *arg) {
   struct tokenize_b_args *const args = arg;
+  const AV1_COMP *cpi = args->cpi;
+  const AV1_COMMON *const cm = &cpi->common;
   ThreadData *const td = args->td;
   MACROBLOCK *const x = &td->mb;
   PVQ_INFO *pvq_info;
@@ -551,7 +554,7 @@ static void tokenize_pvq(int plane, int block, int blk_row, int blk_col,
 
   assert(block < MAX_PVQ_BLOCKS_IN_SB);
   pvq_info = &x->pvq[block][plane];
-  add_pvq_block(x, pvq_info);
+  add_pvq_block((AV1_COMMON *const)cm, x, pvq_info);
 }
 #endif
 
