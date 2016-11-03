@@ -408,7 +408,7 @@ static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
 }
 #endif
 
-static int pvq_decode_helper2(
+static int av1_pvq_decode_helper2(
     MACROBLOCKD *const xd, MB_MODE_INFO *const mbmi, int plane, int row,
     int col, TX_SIZE tx_size, TX_TYPE tx_type ) {
   struct macroblockd_plane *const pd = &xd->plane[plane];
@@ -504,7 +504,7 @@ static void predict_and_reconstruct_intra_block(
     inverse_transform_block(xd, plane, tx_type, tx_size, dst, pd->dst.stride,
                             eob);
 #else
-    pvq_decode_helper2(xd, mbmi, plane, row, col, tx_size, tx_type);
+    av1_pvq_decode_helper2(xd, mbmi, plane, row, col, tx_size, tx_type);
 #endif
   }
 }
@@ -534,7 +534,7 @@ static int reconstruct_inter_block(AV1_COMMON *cm, MACROBLOCKD *const xd,
                           &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
                           pd->dst.stride, eob);
 #else
-  eob = pvq_decode_helper2(xd, mbmi, plane, row, col, tx_size, tx_type);
+  eob = av1_pvq_decode_helper2(xd, mbmi, plane, row, col, tx_size, tx_type);
 #endif
   return eob;
 }
