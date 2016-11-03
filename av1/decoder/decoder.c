@@ -35,8 +35,6 @@
 
 #if !CONFIG_PVQ
 #include "av1/decoder/detokenize.h"
-#else
-#include "av1/decoder/decint.h"
 #endif
 
 static void initialize_dec(void) {

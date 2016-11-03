@@ -1063,8 +1063,12 @@ static void write_mb_modes_kf(AV1_COMMON *cm, const MACROBLOCKD *xd,
 PVQ_INFO *get_pvq_block(PVQ_QUEUE *pvq_q) {
   PVQ_INFO *pvq;
 
+  assert(pvq_q->curr_pos <= pvq_q->last_pos);
+  assert(pvq_q->curr_pos < pvq_q->buf_len);
+
   pvq = pvq_q->buf + pvq_q->curr_pos;
   ++pvq_q->curr_pos;
+
   return pvq;
 }
 #endif
@@ -1166,6 +1170,10 @@ static void write_modes_b(AV1_COMP *cpi, const TileInfo *const tile,
           num_4x4_h + (xd->mb_to_bottom_edge >= 0
                            ? 0
                            : xd->mb_to_bottom_edge >> (5 + pd->subsampling_y));
+
+      // TODO(yushin) Try to use av1_foreach_transformed_block_in_plane().
+      // Logic like the mb_to_right_edge/mb_to_bottom_edge stuff should
+      // really be centralized in one place.
 
       for (idy = 0; idy < max_blocks_high; idy += step) {
         for (idx = 0; idx < max_blocks_wide; idx += step) {

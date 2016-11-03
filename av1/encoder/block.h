@@ -163,11 +163,16 @@ struct macroblock {
   // 1 if neither AC nor DC is coded. Only used during RDO.
   int pvq_skip[MAX_MB_PLANE];
   PVQ_QUEUE *pvq_q;
+
+  // Storage for PVQ tx block encodings in a superblock.
+  // There can be max 16x16 of 4x4 blocks (and YUV) encode by PVQ
   // 256 is the max # of 4x4 blocks in a SB (64x64), which comes from:
   // 1) Since PVQ is applied to each trasnform-ed block
   // 2) 4x4 is the smallest tx size in AV1
   // 3) AV1 allows using smaller tx size than block (i.e. partition) size
-  PVQ_INFO pvq[256][3];  // 16x16 of 4x4 blocks, YUV
+  // TODO(yushin) : The memory usage could be improved a lot, since this has
+  // storage for 10 bands and 128 coefficients for every 4x4 block,
+  PVQ_INFO pvq[MAX_SB_SQUARE >> 2 * OD_LOG_BSIZE0][MAX_MB_PLANE];
   daala_enc_ctx daala_enc;
   int pvq_speed;
   int pvq_coded;  // Indicates whether pvq_info needs be stored to tokenize

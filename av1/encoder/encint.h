@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, Alliance for Open Media. All rights reserved
+ * Copyright (c) 2001-2016, Alliance for Open Media. All rights reserved
  *
  * This source code is subject to the terms of the BSD 2 Clause License and
  * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
@@ -22,7 +22,9 @@ typedef struct od_rollback_buffer od_rollback_buffer;
 # include "av1/common/pvq_state.h"
 
 struct daala_enc_ctx{
+  /* Stores context-adaptive CDFs for PVQ. */
   od_state state;
+  /* Daala entropy encoder. */
   od_ec_enc ec;
   int use_activity_masking;
   /* Mode of quantization matrice : FLAT (0) or HVS (1) */

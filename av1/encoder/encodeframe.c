@@ -1908,7 +1908,6 @@ static void rd_use_partition(AV1_COMP *cpi, ThreadData *td,
                                    split_subsize);
       chosen_rdc.rate += cpi->partition_cost[pl][PARTITION_NONE];
     }
-
     pl = partition_plane_context(xd, mi_row, mi_col, bsize);
     if (chosen_rdc.rate < INT_MAX) {
       chosen_rdc.rate += cpi->partition_cost[pl][PARTITION_SPLIT];
@@ -2607,7 +2606,6 @@ static void rd_pick_partition(const AV1_COMP *const cpi, ThreadData *td,
   if (best_rdc.rate < INT_MAX && best_rdc.dist < INT64_MAX &&
       pc_tree->index != 3) {
     int output_enabled = (bsize == BLOCK_64X64);
-
     encode_sb(cpi, td, tile_info, tp, mi_row, mi_col, output_enabled, bsize,
               pc_tree);
   }
@@ -2833,7 +2831,7 @@ void av1_init_tile_data(AV1_COMP *cpi) {
         // This will be dynamically increased as more pvq block is encoded.
         tile_data->pvq_q.buf_len = 5000;
         CHECK_MEM_ERROR(cm, tile_data->pvq_q.buf,
-                        aom_calloc(tile_data->pvq_q.buf_len, sizeof(PVQ_INFO)));
+                        aom_malloc(tile_data->pvq_q.buf_len * sizeof(PVQ_INFO)));
         tile_data->pvq_q.curr_pos = 0;
 #endif
       }
