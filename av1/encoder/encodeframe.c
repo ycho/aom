@@ -2874,10 +2874,8 @@ void av1_encode_tile(AV1_COMP *cpi, ThreadData *td, int tile_row,
 #if CONFIG_PVQ
   td->mb.pvq_q = &this_tile->pvq_q;
 
-  td->mb.daala_enc.state.qm = (int16_t *)aom_calloc(
-      OD_QM_BUFFER_SIZE, sizeof(td->mb.daala_enc.state.qm[0]));
-  td->mb.daala_enc.state.qm_inv = (int16_t *)aom_calloc(
-      OD_QM_BUFFER_SIZE, sizeof(td->mb.daala_enc.state.qm_inv[0]));
+  // TODO(yushin)
+  // If activity masking is enabled, change below to OD_HVS_QM
   td->mb.daala_enc.qm = OD_FLAT_QM;  // Hard coded. Enc/dec required to sync.
   {
     // FIXME: Multiple segments support
@@ -2911,8 +2909,6 @@ void av1_encode_tile(AV1_COMP *cpi, ThreadData *td, int tile_row,
   assert(tok - cpi->tile_tok[tile_row][tile_col] <=
          allocated_tokens(*tile_info));
 #if CONFIG_PVQ
-  aom_free(td->mb.daala_enc.state.qm);
-  aom_free(td->mb.daala_enc.state.qm_inv);
   od_ec_enc_clear(&td->mb.daala_enc.ec);
 
   td->mb.pvq_q->last_pos = td->mb.pvq_q->curr_pos;

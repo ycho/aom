@@ -26,7 +26,7 @@ struct daala_dec_ctx {
   od_state state;
   /* Daala entropy decoder. */
   od_ec_dec *ec;
-  /* Quantization matrices */
+  /* Mode of quantization matrice : FLAT (0) or HVS (1) */
   int qm;
 };
 

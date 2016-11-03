@@ -535,12 +535,8 @@ void av1_first_pass(AV1_COMP *cpi, const struct lookahead_entry *source) {
 
     x->pvq_q = &pvq_q;
 
-    CHECK_MEM_ERROR(
-        cm, x->daala_enc.state.qm,
-        aom_calloc(OD_QM_BUFFER_SIZE, sizeof(x->daala_enc.state.qm[0])));
-    CHECK_MEM_ERROR(
-        cm, x->daala_enc.state.qm_inv,
-        aom_calloc(OD_QM_BUFFER_SIZE, sizeof(x->daala_enc.state.qm_inv[0])));
+    // TODO(yushin)
+    // If activity masking is enabled, change below to OD_HVS_QM
     x->daala_enc.qm = OD_FLAT_QM;  // Hard coded. Enc/dec required to sync.
     x->daala_enc.pvq_norm_lambda = OD_PVQ_LAMBDA;
     x->daala_enc.pvq_norm_lambda_dc = OD_PVQ_LAMBDA;
@@ -951,8 +947,6 @@ void av1_first_pass(AV1_COMP *cpi, const struct lookahead_entry *source) {
   }
 
 #if CONFIG_PVQ
-  aom_free(x->daala_enc.state.qm);
-  aom_free(x->daala_enc.state.qm_inv);
   od_ec_enc_clear(&x->daala_enc.ec);
 
   x->pvq_q->last_pos = x->pvq_q->curr_pos;

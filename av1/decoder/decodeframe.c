@@ -1437,19 +1437,10 @@ static void daala_dec_init(daala_dec_ctx *daala_dec, od_ec_dec *ec) {
   daala_dec->ec = ec;
   od_adapt_ctx_reset(&daala_dec->state.adapt, 0);
 
-  daala_dec->state.qm =
-      aom_calloc(OD_QM_BUFFER_SIZE, sizeof(daala_dec->state.qm[0]));
-  daala_dec->state.qm_inv =
-      aom_calloc(OD_QM_BUFFER_SIZE, sizeof(daala_dec->state.qm_inv[0]));
   daala_dec->qm = OD_FLAT_QM;
 
   od_init_qm(daala_dec->state.qm, daala_dec->state.qm_inv,
              daala_dec->qm == OD_HVS_QM ? OD_QM8_Q4_HVS : OD_QM8_Q4_FLAT);
-}
-
-static void daala_dec_free(daala_dec_ctx *daala_dec) {
-  aom_free(daala_dec->state.qm);
-  aom_free(daala_dec->state.qm_inv);
 }
 #endif
 
@@ -1640,16 +1631,6 @@ static const uint8_t *decode_tiles(AV1Decoder *pbi, const uint8_t *data,
 
   // Get last tile data.
   tile_data = pbi->tile_data + tile_cols * tile_rows - 1;
-
-#if CONFIG_PVQ
-  // Deallocate tile-local data
-  for (tile_row = 0; tile_row < tile_rows; ++tile_row) {
-    for (tile_col = 0; tile_col < tile_cols; ++tile_col) {
-      tile_data = pbi->tile_data + tile_cols * tile_row + tile_col;
-      daala_dec_free(&tile_data->xd.daala_dec);
-    }
-  }
-#endif
 
   if (cm->frame_parallel_decode)
     av1_frameworker_broadcast(pbi->cur_buf, INT_MAX);
@@ -1843,13 +1824,6 @@ static const uint8_t *decode_tiles_mt(AV1Decoder *pbi, const uint8_t *data,
       // in cm. Additionally once the threads have been synced and an error is
       // detected, there's no point in continuing to decode tiles.
       pbi->mb.corrupted |= !winterface->sync(worker);
-
-#if CONFIG_PVQ
-      {
-        TileWorkerData *tile_data = (TileWorkerData *)worker->data1;
-        daala_dec_free(&tile_data->xd.daala_dec);
-      }
-#endif
     }
     if (final_worker > -1) {
       TileWorkerData *const tile_data =

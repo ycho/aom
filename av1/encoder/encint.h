@@ -25,6 +25,7 @@ struct daala_enc_ctx{
   od_state state;
   od_ec_enc ec;
   int use_activity_masking;
+  /* Mode of quantization matrice : FLAT (0) or HVS (1) */
   int qm;
   /*Normalized PVQ lambda for use where we've already performed
      quantization.*/

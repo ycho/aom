@@ -37,7 +37,7 @@ extern "C" {
 
 /*Smallest blocks are 4x4*/
 #define OD_LOG_BSIZE0 (2)
-/*There are 5 block sizes total (4x4, 8x8, 16x16 and 32x32).*/
+/*There are 4 block sizes total (4x4, 8x8, 16x16 and 32x32).*/
 #define OD_NBSIZES (4)
 /*The log of the maximum length of the side of a block.*/
 #define OD_LOG_BSIZE_MAX (OD_LOG_BSIZE0 + OD_NBSIZES - 1)

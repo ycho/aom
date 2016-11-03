@@ -45,8 +45,8 @@ struct od_state {
   /* unsigned char pvq_qm_q4[OD_NPLANES_MAX][OD_QM_SIZE]; */
 
   /* Quantization matrices and their inverses. */
-  int16_t *qm;
-  int16_t *qm_inv;
+  int16_t qm[OD_QM_BUFFER_SIZE];
+  int16_t qm_inv[OD_QM_BUFFER_SIZE];
 };
 
 void od_adapt_ctx_reset(od_adapt_ctx *state, int is_keyframe);
