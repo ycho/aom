@@ -14,19 +14,29 @@
 
 #include "odintrin.h"
 
-#if defined(DAALA_ODINTRIN)
-#include "filter.h"
-typedef int16_t od_dering_in;
-#endif
-
 #define OD_DERINGSIZES (2)
+
+#define OD_DERING_SIZE_LOG2 (3)
 
 #define OD_DERING_NBLOCKS (OD_BSIZE_MAX / 8)
 
-#define OD_FILT_BORDER (3)
-#define OD_FILT_BSTRIDE (OD_BSIZE_MAX + 2 * OD_FILT_BORDER)
+/* We need to buffer three vertical lines. */
+#define OD_FILT_VBORDER (3)
+/* We only need to buffer three horizontal lines too, but let's make it four
+   to make vectorization easier. */
+#define OD_FILT_HBORDER (4)
+#define OD_FILT_BSTRIDE (OD_BSIZE_MAX + 2 * OD_FILT_HBORDER)
+
+#define OD_DERING_VERY_LARGE (30000)
+#define OD_DERING_INBUF_SIZE \
+  (OD_FILT_BSTRIDE * (OD_BSIZE_MAX + 2 * OD_FILT_VBORDER))
 
 extern const int OD_DIRECTION_OFFSETS_TABLE[8][3];
+
+typedef struct {
+  unsigned char by;
+  unsigned char bx;
+} dering_list;
 
 typedef int (*od_filter_dering_direction_func)(int16_t *y, int ystride,
                                                const int16_t *in, int threshold,
@@ -34,10 +44,13 @@ typedef int (*od_filter_dering_direction_func)(int16_t *y, int ystride,
 typedef void (*od_filter_dering_orthogonal_func)(int16_t *y, int ystride,
                                                  const int16_t *in,
                                                  int threshold, int dir);
-void od_dering(int16_t *y, int ystride, const od_dering_in *x, int xstride,
-               int nvb, int nhb, int sbx, int sby, int nhsb, int nvsb, int xdec,
+void copy_dering_16bit_to_16bit(int16_t *dst, int dstride, int16_t *src,
+                                dering_list *dlist, int dering_count,
+                                int bsize);
+
+void od_dering(int16_t *y, int16_t *in, int xdec,
                int dir[OD_DERING_NBLOCKS][OD_DERING_NBLOCKS], int pli,
-               unsigned char *bskip, int skip_stride, int threshold,
+               dering_list *dlist, int skip_stride, int threshold,
                int coeff_shift);
 int od_filter_dering_direction_4x4_c(int16_t *y, int ystride, const int16_t *in,
                                      int threshold, int dir);

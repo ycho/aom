@@ -16,6 +16,7 @@
 #include "aom/aom_integer.h"
 #include "./aom_config.h"
 #include "aom_ports/mem.h"
+#include "od_dering.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,6 +30,8 @@ extern "C" {
 
 int compute_level_from_index(int global_level, int gi);
 int sb_all_skip(const AV1_COMMON *const cm, int mi_row, int mi_col);
+int sb_compute_dering_list(const AV1_COMMON *const cm, int mi_row, int mi_col,
+                           dering_list *dlist);
 void av1_dering_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm,
                       MACROBLOCKD *xd, int global_level);
 
