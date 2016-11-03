@@ -347,23 +347,22 @@ static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
   const int is_keyframe = 0;
   const int has_dc_skip = 1;
   int quant_shift = bs == TX_32X32 ? 1 : 0;
+  // DC quantizer for PVQ
   int pvq_dc_quant;
   int lossless = (quant[0] == 0);
-  const int blk_size = 1 << (bs + 2);
+  const int blk_size = tx_size_1d[bs];
   int eob = 0;
   int i;
   // TODO(yushin) : To enable activity masking,
   // int use_activity_masking = dec->use_activity_masking;
   int use_activity_masking = 0;
 
-  DECLARE_ALIGNED(16, int16_t, dqcoeff_pvq[64 * 64]);
-  DECLARE_ALIGNED(16, int16_t, ref_coeff_pvq[64 * 64]);
+  DECLARE_ALIGNED(16, int16_t, dqcoeff_pvq[OD_BSIZE_MAX * OD_BSIZE_MAX]);
+  DECLARE_ALIGNED(16, int16_t, ref_coeff_pvq[OD_BSIZE_MAX * OD_BSIZE_MAX]);
 
-  od_coeff ref_int32[64 * 64];
-  od_coeff out_int32[64 * 64];
+  od_coeff ref_int32[OD_BSIZE_MAX * OD_BSIZE_MAX];
+  od_coeff out_int32[OD_BSIZE_MAX * OD_BSIZE_MAX];
 
-  /*Safely initialize d since some coeffs are skipped by PVQ.*/
-  // od_init_skipped_coeffs(dqcoeff, ref_coeff, 0, 0, blk_size, blk_size);
   od_raster_to_coding_order(ref_coeff_pvq, blk_size, tx_type, ref_coeff,
                             blk_size);
 
@@ -384,7 +383,7 @@ static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
 
   od_pvq_decode(dec, ref_int32, out_int32, (int)quant[1] >> quant_shift, pli,
                 bs, OD_PVQ_BETA[use_activity_masking][pli][bs],
-                1,  // OD_ROBUST_STREAM
+                OD_ROBUST_STREAM,
                 is_keyframe, &flags, ac_dc_coded, dec->state.qm + off,
                 dec->state.qm_inv + off);
 
@@ -403,15 +402,75 @@ static int av1_pvq_decode_helper(od_dec_ctx *dec, int16_t *ref_coeff,
 
   od_coding_order_to_raster(dqcoeff, blk_size, tx_type, dqcoeff_pvq, blk_size);
 
-  // Mark last nonzero coeff position.
-  // for (j = 0; j < blk_size * blk_size; j++)
-  //  if (dqcoeff[j]) eob = j + 1;
-
   eob = blk_size * blk_size;
 
   return eob;
 }
 #endif
+
+static int pvq_decode_helper2(
+    MACROBLOCKD *const xd, MB_MODE_INFO *const mbmi, int plane, int row,
+    int col, TX_SIZE tx_size, TX_TYPE tx_type ) {
+  struct macroblockd_plane *const pd = &xd->plane[plane];
+  // transform block size in pixels
+  int tx_blk_size = tx_size_1d[tx_size];
+  int i, j;
+  tran_low_t *pvq_ref_coeff = pd->pvq_ref_coeff;
+  const int diff_stride = tx_blk_size;
+  int16_t *pred = pd->pred;
+  tran_low_t *const dqcoeff = pd->dqcoeff;
+  int ac_dc_coded;  // bit0: DC coded, bit1 : AC coded
+  uint8_t *dst;
+  int eob;
+
+  eob = 0;
+  dst = &pd->dst.buf[4 * row * pd->dst.stride + 4 * col];
+
+  // decode ac/dc coded flag. bit0: DC coded, bit1 : AC coded
+  // NOTE : we don't use 5 symbols for luma here in aom codebase,
+  // since block partition is taken care of by aom.
+  // So, only AC/DC skip info is coded
+  ac_dc_coded = od_decode_cdf_adapt(
+      xd->daala_dec.ec,
+      xd->daala_dec.state.adapt.skip_cdf[2 * tx_size + (plane != 0)], 4,
+      xd->daala_dec.state.adapt.skip_increment, "skip");
+
+  if (ac_dc_coded) {
+    int xdec = pd->subsampling_x;
+    int seg_id = mbmi->segment_id;
+    int16_t *quant;
+    FWD_TXFM_PARAM fwd_txfm_param;
+
+    for (j = 0; j < tx_blk_size; j++)
+      for (i = 0; i < tx_blk_size; i++) {
+        pred[diff_stride * j + i] = dst[pd->dst.stride * j + i];
+      }
+
+    fwd_txfm_param.tx_type = tx_type;
+    fwd_txfm_param.tx_size = tx_size;
+    fwd_txfm_param.fwd_txfm_opt = FWD_TXFM_OPT_NORMAL;
+    fwd_txfm_param.rd_transform = 0;
+    fwd_txfm_param.lossless = xd->lossless[seg_id];
+
+    fwd_txfm(pred, pvq_ref_coeff, diff_stride, &fwd_txfm_param);
+
+    quant = &pd->seg_dequant[seg_id][0];  // aom's quantizer
+
+    eob = av1_pvq_decode_helper(&xd->daala_dec, pvq_ref_coeff, dqcoeff, quant,
+                                plane, tx_size, tx_type, xdec, ac_dc_coded);
+
+    // Since av1 does not have separate inverse transform
+    // but also contains adding to predicted image,
+    // pass blank dummy image to av1_inv_txfm_add_*x*(), i.e. set dst as zeros
+    for (j = 0; j < tx_blk_size; j++)
+      for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
+
+    inverse_transform_block(xd, plane, tx_type, tx_size, dst,
+                            pd->dst.stride, eob);
+  }
+
+  return eob;
+}
 
 static void predict_and_reconstruct_intra_block(
     AV1_COMMON *cm, MACROBLOCKD *const xd, aom_reader *r,
@@ -445,61 +504,7 @@ static void predict_and_reconstruct_intra_block(
     inverse_transform_block(xd, plane, tx_type, tx_size, dst, pd->dst.stride,
                             eob);
 #else
-    // pvq_decode() for intra block runs here.
-    // transform block size in pixels
-    int tx_blk_size = 1 << (tx_size + 2);
-    int i, j;
-    tran_low_t *pvq_ref_coeff = pd->pvq_ref_coeff;
-    const int diff_stride = tx_blk_size;
-    int16_t *pred = pd->pred;
-    tran_low_t *const dqcoeff = pd->dqcoeff;
-    int ac_dc_coded;  // bit0: DC coded, bit1 : AC coded
-
-    // decode ac/dc coded flag. bit0: DC coded, bit1 : AC coded
-    // NOTE : we don't use 5 symbols for luma here in aom codebase,
-    // since block partition is taken care of by aom.
-    // So, only AC/DC skip info is coded
-    ac_dc_coded = od_decode_cdf_adapt(
-        xd->daala_dec.ec,
-        xd->daala_dec.state.adapt.skip_cdf[2 * tx_size + (plane != 0)], 4,
-        xd->daala_dec.state.adapt.skip_increment, "skip");
-
-    if (ac_dc_coded) {
-      int eob = 0;
-      int xdec = pd->subsampling_x;
-      int seg_id = mbmi->segment_id;
-      int16_t *quant;
-      FWD_TXFM_PARAM fwd_txfm_param;
-
-      for (j = 0; j < tx_blk_size; j++)
-        for (i = 0; i < tx_blk_size; i++) {
-          pred[diff_stride * j + i] = dst[pd->dst.stride * j + i];
-        }
-
-      fwd_txfm_param.tx_type = tx_type;
-      fwd_txfm_param.tx_size = tx_size;
-      fwd_txfm_param.fwd_txfm_opt = FWD_TXFM_OPT_NORMAL;
-      fwd_txfm_param.rd_transform = 0;
-      fwd_txfm_param.lossless = xd->lossless[seg_id];
-
-      fwd_txfm(pred, pvq_ref_coeff, diff_stride, &fwd_txfm_param);
-
-      quant = &pd->seg_dequant[seg_id][0];  // aom's quantizer
-
-      eob = av1_pvq_decode_helper(&xd->daala_dec, pvq_ref_coeff, dqcoeff, quant,
-                                  plane, tx_size, tx_type, xdec, ac_dc_coded);
-
-      // Since av1 does not have separate inverse transform
-      // but also contains adding to predicted image,
-      // pass blank dummy image to av1_inv_txfm_add_*x*(), i.e. set dst as zeros
-      if (eob > 0) {
-        for (j = 0; j < tx_blk_size; j++)
-          for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
-
-        inverse_transform_block(xd, plane, tx_type, tx_size, dst,
-                                pd->dst.stride, eob);
-      }
-    }
+    pvq_decode_helper2(xd, mbmi, plane, row, col, tx_size, tx_type);
 #endif
   }
 }
@@ -512,6 +517,12 @@ static int reconstruct_inter_block(AV1_COMMON *cm, MACROBLOCKD *const xd,
   PLANE_TYPE plane_type = (plane == 0) ? PLANE_TYPE_Y : PLANE_TYPE_UV;
   int block_idx = (row << 1) + col;
   TX_TYPE tx_type = get_tx_type(plane_type, xd, block_idx);
+#if CONFIG_PVQ
+  int eob;
+  (void)cm;
+  (void)r;
+#endif
+
 #if !CONFIG_PVQ
   const SCAN_ORDER *scan_order = get_scan(cm, tx_size, tx_type);
   const int eob = av1_decode_block_tokens(xd, plane, scan_order, col, row,
@@ -523,69 +534,7 @@ static int reconstruct_inter_block(AV1_COMMON *cm, MACROBLOCKD *const xd,
                           &pd->dst.buf[4 * row * pd->dst.stride + 4 * col],
                           pd->dst.stride, eob);
 #else
-  int ac_dc_coded;
-  int eob = 0;
-
-  (void)cm;
-  (void)r;
-
-  // pvq_decode() for inter block runs here.
-
-  // decode ac/dc skip flag. bit0: 0 : DC skipped, bit1 : 0: AC skipped
-  // NOTE : we don't use 5 symbols for luma here in aom codebase,
-  // since block partition is taken care of by aom.
-  // So, only AC/DC skip info is coded
-  ac_dc_coded = od_decode_cdf_adapt(
-      xd->daala_dec.ec,
-      xd->daala_dec.state.adapt.skip_cdf[2 * tx_size + (plane != 0)], 4,
-      xd->daala_dec.state.adapt.skip_increment, "skip");
-
-  if (ac_dc_coded) {
-    // transform block size in pixels
-    int tx_blk_size = 1 << (tx_size + 2);
-    int i, j;
-    tran_low_t *pvq_ref_coeff = pd->pvq_ref_coeff;
-    const int diff_stride = tx_blk_size;
-    int16_t *pred = pd->pred;
-    uint8_t *dst;
-    tran_low_t *const dqcoeff = pd->dqcoeff;
-    int xdec = pd->subsampling_x;
-    int seg_id = mbmi->segment_id;
-    int16_t *quant;
-    FWD_TXFM_PARAM fwd_txfm_param;
-
-    dst = &pd->dst.buf[4 * row * pd->dst.stride + 4 * col];
-
-    for (j = 0; j < tx_blk_size; j++)
-      for (i = 0; i < tx_blk_size; i++) {
-        pred[diff_stride * j + i] = dst[pd->dst.stride * j + i];
-      }
-
-    fwd_txfm_param.tx_type = tx_type;
-    fwd_txfm_param.tx_size = tx_size;
-    fwd_txfm_param.fwd_txfm_opt = FWD_TXFM_OPT_NORMAL;
-    fwd_txfm_param.rd_transform = 0;
-    fwd_txfm_param.lossless = xd->lossless[seg_id];
-
-    fwd_txfm(pred, pvq_ref_coeff, diff_stride, &fwd_txfm_param);
-
-    quant = &pd->seg_dequant[seg_id][0];  // aom's DC quantizer
-
-    eob = av1_pvq_decode_helper(&xd->daala_dec, pvq_ref_coeff, dqcoeff, quant,
-                                plane, tx_size, tx_type, xdec, ac_dc_coded);
-
-    // Since av1 does not have separate inverse transform
-    // but also contains adding to predicted image,
-    // pass blank dummy image to av1_inv_txfm_add_*x*(), i.e. set dst as
-    // zeros
-    if (eob > 0) {
-      for (j = 0; j < tx_blk_size; j++)
-        for (i = 0; i < tx_blk_size; i++) dst[j * pd->dst.stride + i] = 0;
-
-      inverse_transform_block(xd, plane, tx_type, tx_size, dst, pd->dst.stride,
-                              eob);
-    }
-  }
+  eob = pvq_decode_helper2(xd, mbmi, plane, row, col, tx_size, tx_type);
 #endif
   return eob;
 }
