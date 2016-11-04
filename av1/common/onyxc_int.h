@@ -23,7 +23,7 @@
 #include "av1/common/frame_buffers.h"
 #include "av1/common/loopfilter.h"
 #include "av1/common/tile_common.h"
-#include "odintrin.h"
+#include "av1/common/odintrin.h"
 #if CONFIG_PVQ
 #include "av1/common/pvq.h"
 #endif
