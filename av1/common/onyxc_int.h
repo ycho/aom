@@ -25,7 +25,7 @@
 #include "av1/common/tile_common.h"
 #include "odintrin.h"
 #if CONFIG_PVQ
-#include "pvq.h"
+#include "av1/common/pvq.h"
 #endif
 
 #ifdef __cplusplus
