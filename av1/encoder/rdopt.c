@@ -755,7 +755,7 @@ static void choose_tx_size_from_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
   *psse = INT64_MAX;
 
 #if CONFIG_PVQ
-  if (end_tx < TX_32X32) od_encode_checkpoint(&x->daala_enc, &buf);
+  od_encode_checkpoint(&x->daala_enc, &buf);
 #endif
 
   for (tx_type = DCT_DCT; tx_type < TX_TYPES; ++tx_type) {
