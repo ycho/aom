@@ -33,5 +33,4 @@ int av1_decode_block_tokens(MACROBLOCKD *xd, int plane, const SCAN_ORDER *sc,
 }  // extern "C"
 #endif
 #endif  // AV1_DECODER_DETOKENIZE_H_
-
 #endif

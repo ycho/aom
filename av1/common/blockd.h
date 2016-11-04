@@ -252,7 +252,6 @@ struct macroblockd_plane {
 #endif
   // encoder
   const int16_t *dequant;
-
 #if CONFIG_AOM_QM
   const qm_val_t *seg_qmatrix[MAX_SEGMENTS][2][TX_SIZES];
 #endif

@@ -163,7 +163,6 @@ struct macroblock {
 
   // Used to store sub partition's choices.
   MV pred_mv[MAX_REF_FRAMES];
-
 #if CONFIG_PVQ
   int rate;
   // 1 if neither AC nor DC is coded. Only used during RDO.

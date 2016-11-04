@@ -364,7 +364,6 @@ void av1_xform_quant_fp(const AV1_COMMON *const cm, MACROBLOCK *x, int plane,
   const qm_val_t *qmatrix = pd->seg_qmatrix[seg_id][is_intra][tx_size];
   const qm_val_t *iqmatrix = pd->seg_iqmatrix[seg_id][is_intra][tx_size];
 #endif
-
 #if !CONFIG_PVQ
   const int16_t *src_diff;
   (void)cm;
