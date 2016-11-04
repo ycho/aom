@@ -33,6 +33,25 @@ void od_encode_quantizer_scaling(daala_enc_ctx *enc, int q_scaling, int bx,
  int by, int skip);
 #endif
 
+void pvq_encode_partition(od_ec_enc *ec,
+                                 int qg,
+                                 int theta,
+                                 int max_theta,
+                                 const od_coeff *in,
+                                 int n,
+                                 int k,
+                                 generic_encoder model[3],
+                                 od_adapt_ctx *adapt,
+                                 int *exg,
+                                 int *ext,
+                                 int nodesync,
+                                 int cdf_ctx,
+                                 int is_keyframe,
+                                 int code_skip,
+                                 int skip_rest,
+                                 int encode_flip,
+                                 int flip);
+
 int od_pvq_encode(daala_enc_ctx *enc, od_coeff *ref, const od_coeff *in,
  od_coeff *out, int q_dc, int q_ac, int pli, int bs, const od_val16 *beta, int robust,
  int is_keyframe, int q_scaling, int bx, int by, const int16_t *qm,

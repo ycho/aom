@@ -635,7 +635,7 @@ static int pvq_theta(od_coeff *out, const od_coeff *x0, const od_coeff *r0,
  * @param [in]     encode_flip whether we need to encode the CfL flip flag now
  * @param [in]     flip       value of the CfL flip flag
  */
-static void pvq_encode_partition(od_ec_enc *ec,
+void pvq_encode_partition(od_ec_enc *ec,
                                  int qg,
                                  int theta,
                                  int max_theta,
