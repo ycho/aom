@@ -1770,9 +1770,6 @@ static int64_t rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
     this_rd = RDCOST(x->rdmult, x->rddiv, this_rate, this_distortion);
 
     if (this_rd < best_rd) {
-#if CONFIG_PVQ
-      od_encode_checkpoint(&x->daala_enc, &post_buf);
-#endif
       mode_selected = mode;
       best_rd = this_rd;
       best_tx = mbmi->tx_size;
@@ -1784,6 +1781,9 @@ static int64_t rd_pick_intra_sby_mode(const AV1_COMP *const cpi, MACROBLOCK *x,
       *rate_tokenonly = this_rate_tokenonly;
       *distortion = this_distortion;
       *skippable = s;
+#if CONFIG_PVQ
+      od_encode_checkpoint(&x->daala_enc, &post_buf);
+#endif
     }
   }
 
