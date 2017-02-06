@@ -715,11 +715,11 @@ void pvq_encode_partition(aom_writer *w,
  * @retval quantized value
  */
 int od_rdo_quant(od_coeff x, int q, double delta0, double pvq_norm_lambda) {
-  int n;
+  int threshold;
   /* Optimal quantization threshold is 1/2 + lambda*delta_rate/2. See
      Jmspeex' Journal of Dubious Theoretical Results for details. */
-  n = OD_DIV_R0(abs(x), q);
-  if ((double)abs(x)/q < (double)n/2 + pvq_norm_lambda*delta0/(2*n)) {
+  threshold = 128 + OD_CLAMPI(0, (int)(256*pvq_norm_lambda*delta0/2), 128);
+  if (abs(x) < q*threshold/256) {
     return 0;
   }
   else {
