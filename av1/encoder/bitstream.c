@@ -2227,8 +2227,11 @@ static void write_tokens_b(AV1_COMP *cpi, const TileInfo *const tile,
       const BLOCK_SIZE plane_bsize =
           get_plane_block_size(AOMMAX(bsize, BLOCK_8X8), pd);
 
-      max_blocks_wide = num_4x4_blocks_wide_lookup[plane_bsize];
-      max_blocks_high = num_4x4_blocks_high_lookup[plane_bsize];
+      //max_blocks_wide = num_4x4_blocks_wide_lookup[plane_bsize];
+      //max_blocks_high = num_4x4_blocks_high_lookup[plane_bsize];
+
+      max_blocks_wide = max_block_wide(xd, plane_bsize, plane);
+      max_blocks_high = max_block_high(xd, plane_bsize, plane);
 
       // TODO(yushin) Try to use av1_foreach_transformed_block_in_plane().
       // Logic like the mb_to_right_edge/mb_to_bottom_edge stuff should
