@@ -54,6 +54,9 @@
 #include "av1/encoder/tokenize.h"
 #if CONFIG_PVQ
 #include "av1/encoder/pvq_encoder.h"
+#include "av1/encoder/encoder.h"
+#include "av1/encoder/block.h"
+#include "av1/encoder/encint.h"
 #endif
 
 static struct av1_token intra_mode_encodings[INTRA_MODES];
@@ -2006,6 +2009,79 @@ static void write_mbmi_b(AV1_COMP *cpi, const TileInfo *const tile,
   }
 }
 
+struct pack_pvq_b_args {
+  AV1_COMP *cpi;
+  aom_writer *w;
+};
+
+#if CONFIG_PVQ
+static void write_pvq(int plane, int block, int blk_row, int blk_col,
+    BLOCK_SIZE plane_bsize, TX_SIZE tx_size, void *arg) {
+  struct pack_pvq_b_args *const args = arg;
+  const AV1_COMP *cpi = args->cpi;
+  od_adapt_ctx *adapt = &cpi->td.mb.daala_enc.state.adapt;
+  aom_writer *w = args->w;
+  PVQ_INFO *pvq;
+
+  const int is_keyframe = 0;
+  const int encode_flip = 0;
+  const int flip = 0;
+  const int robust = 1;
+  int i;
+  const int has_dc_skip = 1;
+
+  int *exg = &adapt->pvq.pvq_exg[plane][tx_size][0];
+  int *ext = adapt->pvq.pvq_ext + tx_size * PVQ_MAX_PARTITIONS;
+  generic_encoder *model = adapt->pvq.pvq_param_model;
+
+  (void)block;
+  (void)blk_row;
+  (void)blk_col;
+  (void)plane_bsize;
+
+  pvq = get_pvq_block(cpi->td.mb.pvq_q);
+
+  // encode block skip info
+  aom_encode_cdf_adapt(w, pvq->ac_dc_coded,
+                       adapt->skip_cdf[2 * tx_size + (plane != 0)], 4,
+                       adapt->skip_increment);
+
+  // AC coeffs coded?
+  if (pvq->ac_dc_coded & AC_CODED) {
+    assert(pvq->tx_size == tx_size);
+    for (i = 0; i < pvq->nb_bands; i++) {
+      if (i == 0 || (!pvq->skip_rest &&
+                     !(pvq->skip_dir & (1 << ((i - 1) % 3))))) {
+        pvq_encode_partition(
+            w, pvq->qg[i], pvq->theta[i], pvq->max_theta[i],
+            pvq->y + pvq->off[i], pvq->size[i], pvq->k[i], model, adapt,
+            exg + i, ext + i, robust || is_keyframe,
+            (plane != 0) * OD_TXSIZES * PVQ_MAX_PARTITIONS +
+                pvq->tx_size * PVQ_MAX_PARTITIONS + i,
+            is_keyframe, i == 0 && (i < pvq->nb_bands - 1),
+            pvq->skip_rest, encode_flip, flip);
+      }
+      if (i == 0 && !pvq->skip_rest && pvq->tx_size > 0) {
+        aom_encode_cdf_adapt(
+            w, pvq->skip_dir,
+            &adapt->pvq
+                 .pvq_skip_dir_cdf[(plane != 0) + 2 * (pvq->tx_size - 1)][0],
+            7, adapt->pvq.pvq_skip_dir_increment);
+      }
+    }
+  }
+  // Encode residue of DC coeff, if exist.
+  if (!has_dc_skip || (pvq->ac_dc_coded & DC_CODED)) {
+    generic_encode(w, &adapt->model_dc[plane],
+                   abs(pvq->dq_dc_residue) - has_dc_skip, -1,
+                   &adapt->ex_dc[plane][pvq->tx_size][0], 2);
+  }
+  if ((pvq->ac_dc_coded & DC_CODED)) {
+    aom_write_bit(w, pvq->dq_dc_residue < 0);
+  }
+}
+#endif // #if CONFIG_PVQ
+
 static void write_tokens_b(AV1_COMP *cpi, const TileInfo *const tile,
                            aom_writer *w, const TOKENEXTRA **tok,
                            const TOKENEXTRA *const tok_end, int mi_row,
@@ -2215,83 +2291,11 @@ static void write_tokens_b(AV1_COMP *cpi, const TileInfo *const tile,
 #else
   // PVQ writes its tokens (i.e. symbols) here.
   if (!m->mbmi.skip) {
-    for (plane = 0; plane < MAX_MB_PLANE; ++plane) {
-      PVQ_INFO *pvq;
-      TX_SIZE tx_size =
-          plane ? get_uv_tx_size(&m->mbmi, &xd->plane[plane]) : m->mbmi.tx_size;
-      int idx, idy;
-      const struct macroblockd_plane *const pd = &xd->plane[plane];
-      int max_blocks_wide;
-      int max_blocks_high;
-      int step = (1 << tx_size);
-      const BLOCK_SIZE plane_bsize =
-          get_plane_block_size(AOMMAX(bsize, BLOCK_8X8), pd);
+    struct pack_pvq_b_args arg = { cpi, w };
+    int plane;
 
-      //max_blocks_wide = num_4x4_blocks_wide_lookup[plane_bsize];
-      //max_blocks_high = num_4x4_blocks_high_lookup[plane_bsize];
-
-      max_blocks_wide = max_block_wide(xd, plane_bsize, plane);
-      max_blocks_high = max_block_high(xd, plane_bsize, plane);
-
-      // TODO(yushin) Try to use av1_foreach_transformed_block_in_plane().
-      // Logic like the mb_to_right_edge/mb_to_bottom_edge stuff should
-      // really be centralized in one place.
-
-      for (idy = 0; idy < max_blocks_high; idy += step) {
-        for (idx = 0; idx < max_blocks_wide; idx += step) {
-          const int is_keyframe = 0;
-          const int encode_flip = 0;
-          const int flip = 0;
-          const int robust = 1;
-          int i;
-          const int has_dc_skip = 1;
-          int *exg = &adapt->pvq.pvq_exg[plane][tx_size][0];
-          int *ext = adapt->pvq.pvq_ext + tx_size * PVQ_MAX_PARTITIONS;
-          generic_encoder *model = adapt->pvq.pvq_param_model;
-
-          pvq = get_pvq_block(cpi->td.mb.pvq_q);
-
-          // encode block skip info
-          aom_encode_cdf_adapt(w, pvq->ac_dc_coded,
-                               adapt->skip_cdf[2 * tx_size + (plane != 0)], 4,
-                               adapt->skip_increment);
-
-          // AC coeffs coded?
-          if (pvq->ac_dc_coded & AC_CODED) {
-            assert(pvq->bs == tx_size);
-            for (i = 0; i < pvq->nb_bands; i++) {
-              if (i == 0 || (!pvq->skip_rest &&
-                             !(pvq->skip_dir & (1 << ((i - 1) % 3))))) {
-                pvq_encode_partition(
-                    w, pvq->qg[i], pvq->theta[i], pvq->max_theta[i],
-                    pvq->y + pvq->off[i], pvq->size[i], pvq->k[i], model, adapt,
-                    exg + i, ext + i, robust || is_keyframe,
-                    (plane != 0) * OD_TXSIZES * PVQ_MAX_PARTITIONS +
-                        pvq->bs * PVQ_MAX_PARTITIONS + i,
-                    is_keyframe, i == 0 && (i < pvq->nb_bands - 1),
-                    pvq->skip_rest, encode_flip, flip);
-              }
-              if (i == 0 && !pvq->skip_rest && pvq->bs > 0) {
-                aom_encode_cdf_adapt(
-                    w, pvq->skip_dir,
-                    &adapt->pvq
-                         .pvq_skip_dir_cdf[(plane != 0) + 2 * (pvq->bs - 1)][0],
-                    7, adapt->pvq.pvq_skip_dir_increment);
-              }
-            }
-          }
-          // Encode residue of DC coeff, if exist.
-          if (!has_dc_skip || (pvq->ac_dc_coded & DC_CODED)) {
-            generic_encode(w, &adapt->model_dc[plane],
-                           abs(pvq->dq_dc_residue) - has_dc_skip, -1,
-                           &adapt->ex_dc[plane][pvq->bs][0], 2);
-          }
-          if ((pvq->ac_dc_coded & DC_CODED)) {
-            aom_write_bit(w, pvq->dq_dc_residue < 0);
-          }
-        }
-      }  // for (idy = 0;
-    }    // for (plane =
+    for (plane = 0; plane < MAX_MB_PLANE; ++plane)
+      av1_foreach_transformed_block_in_plane2(xd, bsize, plane, write_pvq, &arg);
   }      // if (!m->mbmi.skip)
 #endif
 }

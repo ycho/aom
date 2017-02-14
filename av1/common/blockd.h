@@ -97,7 +97,7 @@ typedef struct PVQ_INFO {
   int size[PVQ_MAX_PARTITIONS];
   int skip_rest;
   int skip_dir;
-  int bs;  // log of the block size minus two,
+  TX_SIZE tx_size;  // log of the block size minus two,
            // i.e. equivalent to aom's TX_SIZE
   // Block skip info, indicating whether DC/AC, is coded.
   PVQ_SKIP_TYPE ac_dc_coded;  // bit0: DC coded, bit1 : AC coded (1 means coded)
@@ -968,6 +968,10 @@ typedef void (*foreach_transformed_block_visitor)(int plane, int block,
                                                   TX_SIZE tx_size, void *arg);
 
 void av1_foreach_transformed_block_in_plane(
+    const MACROBLOCKD *const xd, BLOCK_SIZE bsize, int plane,
+    foreach_transformed_block_visitor visit, void *arg);
+
+void av1_foreach_transformed_block_in_plane2(
     const MACROBLOCKD *const xd, BLOCK_SIZE bsize, int plane,
     foreach_transformed_block_visitor visit, void *arg);
 

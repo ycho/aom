@@ -1253,9 +1253,9 @@ void av1_store_pvq_enc_info(PVQ_INFO *pvq_info, int *qg, int *theta,
                             int *max_theta, int *k, od_coeff *y, int nb_bands,
                             const int *off, int *size, int skip_rest,
                             int skip_dir,
-                            int bs) {  // block size in log_2 -2
+                            int tx_size) {  // block size in log_2 -2
   int i;
-  const int tx_blk_size = tx_size_wide[bs];
+  const int tx_blk_size = tx_size_wide[tx_size];
 
   for (i = 0; i < nb_bands; i++) {
     pvq_info->qg[i] = qg[i];
@@ -1271,6 +1271,6 @@ void av1_store_pvq_enc_info(PVQ_INFO *pvq_info, int *qg, int *theta,
   pvq_info->nb_bands = nb_bands;
   pvq_info->skip_rest = skip_rest;
   pvq_info->skip_dir = skip_dir;
-  pvq_info->bs = bs;
+  pvq_info->tx_size = tx_size;
 }
 #endif
