@@ -2258,9 +2258,10 @@ static void write_tokens_b(AV1_COMP *cpi, const TileInfo *const tile,
           pvq = get_pvq_block(cpi->td.mb.pvq_q);
 
           // encode block skip info
-          aom_encode_cdf_adapt(w, pvq->ac_dc_coded,
-                               adapt->skip_cdf[2 * tx_size + (plane != 0)], 4,
-                               adapt->skip_increment);
+          aom_encode_cdf_adapt_q15(
+              w, pvq->ac_dc_coded, adapt->skip_cdf[2 * tx_size + (plane != 0)],
+              4, &adapt->skip_count[2 * tx_size + (plane != 0)],
+              adapt->skip_rate);
 
           // AC coeffs coded?
           if (pvq->ac_dc_coded & AC_CODED) {
