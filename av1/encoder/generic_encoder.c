@@ -105,10 +105,8 @@ void generic_encode(aom_writer *w, generic_encoder *model, int x, int max,
   xs = (x + (1 << shift >> 1)) >> shift;
   ms = (max + (1 << shift >> 1)) >> shift;
   OD_ASSERT(max == -1 || xs <= ms);
-  if (max == -1) aom_write_cdf_unscaled(w, OD_MINI(15, xs), cdf, 16);
-  else {
-    aom_write_cdf_unscaled(w, OD_MINI(15, xs), cdf, OD_MINI(ms + 1, 16));
-  }
+  aom_encode_cdf_adapt_q15(w, OD_MINI(15, xs), cdf, 16, &model->count[id],
+                          model->rate);
   if (xs >= 15) {
     int e;
     unsigned decay;
@@ -132,7 +130,7 @@ void generic_encode(aom_writer *w, generic_encoder *model, int x, int max,
        shift - special);
     }
   }
-  generic_model_update(model, ex_q16, x, xs, id, integration);
+  generic_model_update(ex_q16, x, integration);
   OD_LOG((OD_LOG_ENTROPY_CODER, OD_LOG_DEBUG,
    "enc: %d %d %d %d %d %x", *ex_q16, x, shift, id, xs, enc->rng));
 }

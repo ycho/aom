@@ -80,13 +80,14 @@ void aom_cdf_adapt_q15(int val, uint16_t *cdf, int n, int *count, int rate) {
 void generic_model_init(generic_encoder *model) {
   int i;
   int j;
-  model->increment = 64;
   for (i = 0; i < GENERIC_TABLES; i++) {
     for (j = 0; j < 16; j++) {
       /* Do flat initialization equivalent to a single symbol in each bin. */
-      model->cdf[i][j] = (j + 1) * model->increment;
+      model->cdf[i][j] = (j + 1) * 64;
     }
   }
+  OD_CLEARALL(model->count);
+  model->rate = 8;
 }
 
 /** Takes the base-2 log of E(x) in Q1.
@@ -122,23 +123,7 @@ int log_ex(int ex_q16) {
  * @param [in]     integration integration period of ExQ16 (leaky average over
  * 1<<integration samples)
  */
-void generic_model_update(generic_encoder *model, int *ex_q16, int x, int xs,
- int id, int integration) {
-  int i;
-  int xenc;
-  uint16_t *cdf;
-  cdf = model->cdf[id];
-  /* Renormalize if we cannot add increment */
-  if (cdf[15] + model->increment > 32767) {
-    for (i = 0; i < 16; i++) {
-      /* Second term ensures that the pdf is non-null */
-      cdf[i] = (cdf[i] >> 1) + i + 1;
-    }
-  }
-  /* Update freq count */
-  xenc = OD_MINI(15, xs);
-  /* This can be easily vectorized */
-  for (i = xenc; i < 16; i++) cdf[i] += model->increment;
+void generic_model_update(int *ex_q16, int x, int integration) {
   /* We could have saturated ExQ16 directly, but this is safe and simpler */
   x = OD_MINI(x, 32767);
   OD_IIR_DIADIC(*ex_q16, x << 16, integration);
