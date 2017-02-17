@@ -33,8 +33,9 @@ static int aom_decode_pvq_split_(aom_reader *r, od_pvq_codeword_ctx *adapt,
   if (sum == 0) return 0;
   shift = OD_MAXI(0, OD_ILOG(sum) - 3);
   fctx = 7*ctx + (sum >> shift) - 1;
-  msbs = aom_decode_cdf_adapt(r, adapt->pvq_split_cdf[fctx],
-   (sum >> shift) + 1, adapt->pvq_split_increment, ACCT_STR_NAME);
+  msbs = aom_decode_cdf_adapt_q15(r, adapt->pvq_split_cdf[fctx],
+   (sum >> shift) + 1, &adapt->pvq_split_count[fctx], adapt->pvq_split_rate,
+   ACCT_STR_NAME);
   if (shift) count = aom_read_literal(r, shift, ACCT_STR_NAME);
   count += msbs << shift;
   if (count > sum) {
