@@ -196,6 +196,10 @@ void od_fatal_impl(const char *_str, const char *_file, int _line);
 # define OD_CLEAR(dst, n) (memset((dst), 0, sizeof(*(dst))*(n)))
 #endif
 
+#if !defined(OVERRIDE_OD_CLEARALL)
+# define OD_CLEARALL(dst) (memset((dst), 0, sizeof(dst)))
+#endif
+
 /** Silence unused parameter/variable warnings */
 # define OD_UNUSED(expr) (void)(expr)
 

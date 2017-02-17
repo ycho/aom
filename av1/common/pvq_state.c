@@ -17,7 +17,7 @@ void od_adapt_ctx_reset(od_adapt_ctx *adapt, int is_keyframe) {
   int pli;
   od_adapt_pvq_ctx_reset(&adapt->pvq, is_keyframe);
   adapt->skip_rate = is_keyframe ? 4 : 7;
-  OD_CLEAR(adapt->skip_count, OD_TXSIZES * 2);
+  OD_CLEARALL(adapt->skip_count);
   OD_CDFS_INIT(adapt->skip_cdf, 32);
   for (pli = 0; pli < OD_NPLANES_MAX; pli++) {
     generic_model_init(&adapt->model_dc[pli]);
