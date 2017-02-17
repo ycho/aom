@@ -121,7 +121,8 @@ typedef struct od_pvq_codeword_ctx od_pvq_codeword_ctx;
 
 struct od_pvq_codeword_ctx {
   int                 pvq_adapt[2*OD_TXSIZES*OD_NSB_ADAPT_CTXS];
-  int                 pvq_k1_increment;
+  int                 pvq_k1_count[12];
+  int                 pvq_k1_rate;
   /* CDFs are size 16 despite the fact that we're using less than that. */
   uint16_t            pvq_k1_cdf[12][16];
   uint16_t            pvq_split_cdf[22*7][8];

@@ -196,8 +196,9 @@ void od_adapt_pvq_ctx_reset(od_pvq_adapt_ctx *state, int is_keyframe) {
     ctx->pvq_adapt[4*i + OD_ADAPT_COUNT_Q8] = 104;
     ctx->pvq_adapt[4*i + OD_ADAPT_COUNT_EX_Q8] = 128;
   }
-  ctx->pvq_k1_increment = 128;
-  OD_CDFS_INIT(ctx->pvq_k1_cdf, ctx->pvq_k1_increment);
+  ctx->pvq_k1_rate = 8;
+  OD_CDFS_INIT(ctx->pvq_k1_cdf, 128);
+  OD_CLEARALL(ctx->pvq_k1_count);
   for (pli = 0; pli < OD_NPLANES_MAX; pli++) {
     for (bs = 0; bs < OD_TXSIZES; bs++)
     for (i = 0; i < PVQ_MAX_PARTITIONS; i++) {

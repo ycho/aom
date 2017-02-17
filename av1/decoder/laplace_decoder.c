@@ -64,8 +64,8 @@ void aom_decode_band_pvq_splits(aom_reader *r, od_pvq_codeword_ctx *adapt,
     int pos;
     cdf_id = od_pvq_k1_ctx(n, level == 0);
     OD_CLEAR(y, n);
-    pos = aom_decode_cdf_adapt(r, adapt->pvq_k1_cdf[cdf_id], n,
-     adapt->pvq_k1_increment, "pvq:k1");
+    pos = aom_decode_cdf_adapt_q15(r, adapt->pvq_k1_cdf[cdf_id], n,
+     &adapt->pvq_k1_count[cdf_id], adapt->pvq_k1_rate, "pvq:k1");
     y[pos] = 1;
   }
   else {
