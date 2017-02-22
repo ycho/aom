@@ -138,6 +138,7 @@ DECLARE_ALIGNED(16, extern const uint8_t, aom_norm[256]);
 
 #if CONFIG_EC_ADAPT
 static INLINE void update_cdf(aom_cdf_prob *cdf, int val, int nsymbs) {
+#if 0
   const int rate = 4 + (cdf[nsymbs] > 31) + get_msb(nsymbs);
   const int rate2 = 12 - rate;
   int i, tmp;
@@ -163,6 +164,18 @@ static INLINE void update_cdf(aom_cdf_prob *cdf, int val, int nsymbs) {
   }
 #endif
   cdf[nsymbs]++;
+#else
+  int rate;
+  int count;
+
+  extern void aom_cdf_adapt_q15(int val, uint16_t *cdf, int n, int *count, int rate);
+
+  rate = 8;
+  count = cdf[nsymbs];
+  aom_cdf_adapt_q15(val, (uint16_t *)cdf, nsymbs, &count, rate);
+
+  cdf[nsymbs] = count;
+#endif
 }
 #endif
 
