@@ -604,6 +604,8 @@ static double similarity(uint32_t sum_s, uint32_t sum_r, uint32_t sum_sq_s,
   int64_t mse = sum_sq_s + sum_sq_r - 2 * sum_sxr;
   double dist = 0;
   double ssim = 0;
+  double s1 = 1.0;
+  double s2 = 0.0;
 
   if (bd == 8) {
     // scale the constants by number of pixels
@@ -628,14 +630,15 @@ static double similarity(uint32_t sum_s, uint32_t sum_r, uint32_t sum_sq_s,
             (int64_t)count * sum_sq_r - (int64_t)sum_r * sum_r + c2);
 
   ssim = ssim_n * 1.0 / ssim_d;
-  dist = mse * (1.0 - (ssim - 0.8));
+  dist = mse * s1 * (1.0 - (ssim - 0.8 + s2));
 
   //return ssim_n * 1.0 / ssim_d;
   return dist;
 }
 
 // Just to figure whehter it is sse or generic c mode now
-#if (aom_convolve_copy == aom_convolve_copy_sse)
+//#if (aom_convolve_copy == aom_convolve_copy_sse)
+#if 0
 #define aom_ssim_parms_8x8 aom_ssim_parms_8x8_sse2
 #else
 #define aom_ssim_parms_8x8 aom_ssim_parms_8x8_c
