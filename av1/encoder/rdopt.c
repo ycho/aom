@@ -634,7 +634,12 @@ static double similarity(uint32_t sum_s, uint32_t sum_r, uint32_t sum_sq_s,
   return dist;
 }
 
+// Just to figure whehter it is sse or generic c mode now
+#if (aom_convolve_copy == aom_convolve_copy_sse)
 #define aom_ssim_parms_8x8 aom_ssim_parms_8x8_sse2
+#else
+#define aom_ssim_parms_8x8 aom_ssim_parms_8x8_c
+#endif
 
 static double ssim_8x8(const uint8_t *s, int sp, const uint8_t *r, int rp) {
   uint32_t sum_s = 0, sum_r = 0, sum_sq_s = 0, sum_sq_r = 0, sum_sxr = 0;
