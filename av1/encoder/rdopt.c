@@ -543,6 +543,8 @@ static INLINE int write_uniform_cost(int n, int v) {
 #define FAST_EXT_TX_EDST_MARGIN 0.3
 
 #if CONFIG_CDEF_DIST
+//#include "aom_dsp/ssim.h"
+#if 0
 static uint64_t cdef_dist_8x8_16bit(uint16_t *dst, int dstride, uint16_t *src,
                                     int sstride, int coeff_shift) {
   uint64_t svar = 0;
@@ -586,6 +588,78 @@ static uint64_t cdef_dist_8x8_16bit(uint16_t *dst, int dstride, uint16_t *src,
 
   return dist;
 }
+#else
+static const int64_t cc1 = 26634;        // (64^2*(.01*255)^2
+static const int64_t cc2 = 239708;       // (64^2*(.03*255)^2
+static const int64_t cc1_10 = 428658;    // (64^2*(.01*1023)^2
+static const int64_t cc2_10 = 3857925;   // (64^2*(.03*1023)^2
+static const int64_t cc1_12 = 6868593;   // (64^2*(.01*4095)^2
+static const int64_t cc2_12 = 61817334;  // (64^2*(.03*4095)^2
+
+static double similarity(uint32_t sum_s, uint32_t sum_r, uint32_t sum_sq_s,
+                         uint32_t sum_sq_r, uint32_t sum_sxr, int count,
+                         uint32_t bd) {
+  int64_t ssim_n, ssim_d;
+  int64_t c1, c2;
+  if (bd == 8) {
+    // scale the constants by number of pixels
+    c1 = (cc1 * count * count) >> 12;
+    c2 = (cc2 * count * count) >> 12;
+  } else if (bd == 10) {
+    c1 = (cc1_10 * count * count) >> 12;
+    c2 = (cc2_10 * count * count) >> 12;
+  } else if (bd == 12) {
+    c1 = (cc1_12 * count * count) >> 12;
+    c2 = (cc2_12 * count * count) >> 12;
+  } else {
+    c1 = c2 = 0;
+    assert(0);
+  }
+
+  ssim_n = (2 * sum_s * sum_r + c1) *
+           ((int64_t)2 * count * sum_sxr - (int64_t)2 * sum_s * sum_r + c2);
+
+  ssim_d = (sum_s * sum_s + sum_r * sum_r + c1) *
+           ((int64_t)count * sum_sq_s - (int64_t)sum_s * sum_s +
+            (int64_t)count * sum_sq_r - (int64_t)sum_r * sum_r + c2);
+
+  return ssim_n * 1.0 / ssim_d;
+}
+
+#define aom_ssim_parms_8x8 aom_ssim_parms_8x8_sse2
+
+static double ssim_8x8(const uint8_t *s, int sp, const uint8_t *r, int rp) {
+  uint32_t sum_s = 0, sum_r = 0, sum_sq_s = 0, sum_sq_r = 0, sum_sxr = 0;
+  aom_ssim_parms_8x8(s, sp, r, rp, &sum_s, &sum_r, &sum_sq_s, &sum_sq_r,
+                     &sum_sxr);
+  return similarity(sum_s, sum_r, sum_sq_s, sum_sq_r, sum_sxr, 64, 8);
+}
+
+static uint64_t cdef_dist_8x8_16bit(uint16_t *dst, int dstride, uint16_t *src,
+                                    int sstride, int coeff_shift) {
+  uint64_t dist = 0;
+  double ssim = 0;
+  DECLARE_ALIGNED(16, uint8_t, src8[8 * 8]);
+  DECLARE_ALIGNED(16, uint8_t, ref8[8 * 8]);
+  int i, j;
+
+  (void)coeff_shift;
+
+  for (j = 0; j < 8; j++) {
+    for (i = 0; i < 8; i++) {
+      src8[8 * j + i] = src[sstride * j + i];
+      ref8[8 * j + i] = dst[dstride * j + i];
+    }
+  }
+
+  ssim = ssim_8x8(src8, 8, ref8, 8);
+  dist = (uint64_t) 100 * ssim;
+
+  dist = (uint64_t) ( 1.0 * dist);
+
+  return dist;
+}
+#endif
 #endif  // CONFIG_CDEF_DIST
 
 #if CONFIG_DAALA_DIST
