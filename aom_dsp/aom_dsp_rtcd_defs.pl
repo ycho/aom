@@ -853,7 +853,7 @@ if (aom_config("CONFIG_HIGHBITDEPTH") eq "yes") {
 #
 # Structured Similarity (SSIM)
 #
-if (aom_config("CONFIG_INTERNAL_STATS") eq "yes") {
+if (aom_config("CONFIG_INTERNAL_STATS") eq "yes" || (aom_config("CONFIG_CDEF_DIST") eq "yes")) {
   add_proto qw/void aom_ssim_parms_8x8/, "const uint8_t *s, int sp, const uint8_t *r, int rp, uint32_t *sum_s, uint32_t *sum_r, uint32_t *sum_sq_s, uint32_t *sum_sq_r, uint32_t *sum_sxr";
   specialize qw/aom_ssim_parms_8x8/, "$sse2_x86_64";
 
