@@ -601,6 +601,10 @@ static double similarity(uint32_t sum_s, uint32_t sum_r, uint32_t sum_sq_s,
                          uint32_t bd) {
   int64_t ssim_n, ssim_d;
   int64_t c1, c2;
+  int64_t mse = sum_sq_s + sum_sq_r - 2 * sum_sxr;
+  double dist = 0;
+  double ssim = 0;
+
   if (bd == 8) {
     // scale the constants by number of pixels
     c1 = (cc1 * count * count) >> 12;
@@ -623,7 +627,12 @@ static double similarity(uint32_t sum_s, uint32_t sum_r, uint32_t sum_sq_s,
            ((int64_t)count * sum_sq_s - (int64_t)sum_s * sum_s +
             (int64_t)count * sum_sq_r - (int64_t)sum_r * sum_r + c2);
 
-  return ssim_n * 1.0 / ssim_d;
+  ssim = ssim_n * 1.0 / ssim_d;
+
+  dist = mse * (1.0 - (ssim - 0.8));
+
+  //return ssim_n * 1.0 / ssim_d;
+  return dist;
 }
 
 #define aom_ssim_parms_8x8 aom_ssim_parms_8x8_sse2
@@ -639,7 +648,7 @@ static uint64_t cdef_dist_8x8_16bit(uint16_t *dst, int dstride, uint16_t *src,
                                     int sstride, int coeff_shift) {
   uint64_t dist = 0;
   double ssim = 0;
-  uint64_t mse = 0;
+  //uint64_t mse = 0;
 
   DECLARE_ALIGNED(16, uint8_t, src8[8 * 8]);
   DECLARE_ALIGNED(16, uint8_t, ref8[8 * 8]);
@@ -649,11 +658,11 @@ static uint64_t cdef_dist_8x8_16bit(uint16_t *dst, int dstride, uint16_t *src,
 
   for (j = 0; j < 8; j++) {
     for (i = 0; i < 8; i++) {
-      int diff = 0;
+      //int diff = 0;
       src8[8 * j + i] = src[sstride * j + i];
       ref8[8 * j + i] = dst[dstride * j + i];
-      diff = ref8[8 * j + i] - src8[8 * j + i];
-      mse += diff * diff;
+      //diff = ref8[8 * j + i] - src8[8 * j + i];
+      //mse += diff * diff;
     }
   }
 
@@ -662,7 +671,9 @@ static uint64_t cdef_dist_8x8_16bit(uint16_t *dst, int dstride, uint16_t *src,
 
   //dist = (uint64_t) ( 1.0 * dist);
 
-  dist = (uint64_t)(mse / (ssim + 0.1 + 0.01));
+  //dist = (uint64_t)(mse / (ssim + 0.1 + 0.01));
+
+  dist = (uint64_t)ssim;
 
   return dist;
 }
