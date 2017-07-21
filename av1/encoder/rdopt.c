@@ -639,6 +639,8 @@ static uint64_t cdef_dist_8x8_16bit(uint16_t *dst, int dstride, uint16_t *src,
                                     int sstride, int coeff_shift) {
   uint64_t dist = 0;
   double ssim = 0;
+  uint64_t mse = 0;
+
   DECLARE_ALIGNED(16, uint8_t, src8[8 * 8]);
   DECLARE_ALIGNED(16, uint8_t, ref8[8 * 8]);
   int i, j;
@@ -647,15 +649,20 @@ static uint64_t cdef_dist_8x8_16bit(uint16_t *dst, int dstride, uint16_t *src,
 
   for (j = 0; j < 8; j++) {
     for (i = 0; i < 8; i++) {
+      int diff = 0;
       src8[8 * j + i] = src[sstride * j + i];
       ref8[8 * j + i] = dst[dstride * j + i];
+      diff = ref8[8 * j + i] - src8[8 * j + i];
+      mse += diff * diff;
     }
   }
 
   ssim = ssim_8x8(src8, 8, ref8, 8);
-  dist = (uint64_t) 100 * ssim;
+  //dist = (uint64_t) 100 * ssim;
 
-  dist = (uint64_t) ( 1.0 * dist);
+  //dist = (uint64_t) ( 1.0 * dist);
+
+  dist = (uint64_t)(mse / (ssim + 0.1 + 0.01));
 
   return dist;
 }
