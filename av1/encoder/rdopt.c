@@ -10478,6 +10478,11 @@ void av1_rd_pick_inter_mode_sb(const AV1_COMP *cpi, TileDataEnc *tile_data,
 #endif  // CONFIG_EXT_INTER && CONFIG_INTERINTRA
 
     if (ref_frame == INTRA_FRAME) {
+      skippable = 0;
+      distortion_y = INT64_MAX;
+      rate_y = INT_MAX;
+      continue;
+#if 0
       RD_STATS rd_stats_y;
       TX_SIZE uv_tx;
       struct macroblockd_plane *const pd = &xd->plane[1];
@@ -10633,6 +10638,7 @@ void av1_rd_pick_inter_mode_sb(const AV1_COMP *cpi, TileDataEnc *tile_data,
       distortion2 = distortion_y + distortion_uv;
 #if CONFIG_DIST_8X8 && CONFIG_CB4X4
       if (bsize < BLOCK_8X8) distortion2_y = distortion_y;
+#endif
 #endif
     } else {
       int_mv backup_ref_mv[2];
