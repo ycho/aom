@@ -22,7 +22,6 @@
 #include "aom_ports/system_state.h"
 
 #include "av1/common/alloccommon.h"
-#include "av1/encoder/aq_cyclicrefresh.h"
 #include "av1/common/common.h"
 #include "av1/common/entropymode.h"
 #include "av1/common/quant_common.h"
@@ -417,14 +416,10 @@ void av1_rc_update_rate_correction_factors(AV1_COMP *cpi, int width,
   // Work out how big we would have expected the frame to be at this Q given
   // the current correction factor.
   // Stay in double to avoid int overflow when values are large
-  if (cpi->oxcf.aq_mode == CYCLIC_REFRESH_AQ && cpi->common.seg.enabled) {
-    projected_size_based_on_q =
-        av1_cyclic_refresh_estimate_bits_at_q(cpi, rate_correction_factor);
-  } else {
-    projected_size_based_on_q =
-        av1_estimate_bits_at_q(cpi->common.frame_type, cm->base_qindex, MBs,
-                               rate_correction_factor, cm->bit_depth);
-  }
+  projected_size_based_on_q =
+      av1_estimate_bits_at_q(cpi->common.frame_type, cm->base_qindex, MBs,
+                             rate_correction_factor, cm->bit_depth);
+
   // Work out a size correction factor.
   if (projected_size_based_on_q > FRAME_OVERHEAD_BITS)
     correction_factor = (int)((100 * (int64_t)cpi->rc.projected_frame_size) /
@@ -490,13 +485,8 @@ int av1_rc_regulate_q(const AV1_COMP *cpi, int target_bits_per_frame,
   i = active_best_quality;
 
   do {
-    if (cpi->oxcf.aq_mode == CYCLIC_REFRESH_AQ && cm->seg.enabled) {
-      bits_per_mb_at_this_q =
-          (int)av1_cyclic_refresh_rc_bits_per_mb(cpi, i, correction_factor);
-    } else {
-      bits_per_mb_at_this_q = (int)av1_rc_bits_per_mb(
-          cm->frame_type, i, correction_factor, cm->bit_depth);
-    }
+    bits_per_mb_at_this_q = (int)av1_rc_bits_per_mb(
+        cm->frame_type, i, correction_factor, cm->bit_depth);
 
     if (bits_per_mb_at_this_q <= target_bits_per_mb) {
       if ((target_bits_per_mb - bits_per_mb_at_this_q) <= last_error)
@@ -1201,10 +1191,6 @@ void av1_rc_postencode_update(AV1_COMP *cpi, uint64_t bytes_used) {
   RATE_CONTROL *const rc = &cpi->rc;
   const int qindex = cm->base_qindex;
 
-  if (cpi->oxcf.aq_mode == CYCLIC_REFRESH_AQ && cm->seg.enabled) {
-    av1_cyclic_refresh_postencode(cpi);
-  }
-
   // Update rate control heuristics
   rc->projected_frame_size = (int)(bytes_used << 3);
 
@@ -1402,9 +1388,6 @@ void av1_rc_get_one_pass_vbr_params(AV1_COMP *cpi) {
     rc->gfu_boost = DEFAULT_GF_BOOST;
   }
 
-  if (cpi->oxcf.aq_mode == CYCLIC_REFRESH_AQ)
-    av1_cyclic_refresh_update_parameters(cpi);
-
   if (cm->frame_type == KEY_FRAME)
     target = calc_iframe_target_size_one_pass_vbr(cpi);
   else
@@ -1488,11 +1471,7 @@ void av1_rc_get_one_pass_cbr_params(AV1_COMP *cpi) {
     cm->frame_type = INTER_FRAME;
   }
   if (rc->frames_till_gf_update_due == 0) {
-    if (cpi->oxcf.aq_mode == CYCLIC_REFRESH_AQ)
-      av1_cyclic_refresh_set_golden_update(cpi);
-    else
-      rc->baseline_gf_interval =
-          (rc->min_gf_interval + rc->max_gf_interval) / 2;
+    rc->baseline_gf_interval = (rc->min_gf_interval + rc->max_gf_interval) / 2;
     rc->frames_till_gf_update_due = rc->baseline_gf_interval;
     // NOTE: frames_till_gf_update_due must be <= frames_to_key.
     if (rc->frames_till_gf_update_due > rc->frames_to_key)
@@ -1500,11 +1479,6 @@ void av1_rc_get_one_pass_cbr_params(AV1_COMP *cpi) {
     cpi->refresh_golden_frame = 1;
     rc->gfu_boost = DEFAULT_GF_BOOST;
   }
-
-  // Any update/change of global cyclic refresh parameters (amount/delta-qp)
-  // should be done here, before the frame qp is selected.
-  if (cpi->oxcf.aq_mode == CYCLIC_REFRESH_AQ)
-    av1_cyclic_refresh_update_parameters(cpi);
 
   if (cm->frame_type == KEY_FRAME)
     target = calc_iframe_target_size_one_pass_cbr(cpi);

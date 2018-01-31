@@ -72,17 +72,11 @@ TEST_P(AqSegmentTest, TestNoMisMatchAQ1) { DoTest(1); }
 // encodes and decodes without a mismatch.
 TEST_P(AqSegmentTest, TestNoMisMatchAQ2) { DoTest(2); }
 
-// Validate that this AQ segmentation mode (AQ=3, cyclic_refresh_aq)
-// encodes and decodes without a mismatch.
-TEST_P(AqSegmentTest, TestNoMisMatchAQ3) { DoTest(3); }
-
 class AqSegmentTestLarge : public AqSegmentTest {};
 
 TEST_P(AqSegmentTestLarge, TestNoMisMatchAQ1) { DoTest(1); }
 
 TEST_P(AqSegmentTestLarge, TestNoMisMatchAQ2) { DoTest(2); }
-
-TEST_P(AqSegmentTestLarge, TestNoMisMatchAQ3) { DoTest(3); }
 
 // Validate that this delta q mode
 // encodes and decodes without a mismatch.

@@ -92,8 +92,6 @@ set(AOM_AV1_ENCODER_SOURCES
     "${AOM_ROOT}/av1/av1_cx_iface.c"
     "${AOM_ROOT}/av1/encoder/aq_complexity.c"
     "${AOM_ROOT}/av1/encoder/aq_complexity.h"
-    "${AOM_ROOT}/av1/encoder/aq_cyclicrefresh.c"
-    "${AOM_ROOT}/av1/encoder/aq_cyclicrefresh.h"
     "${AOM_ROOT}/av1/encoder/aq_variance.c"
     "${AOM_ROOT}/av1/encoder/aq_variance.h"
     "${AOM_ROOT}/av1/encoder/av1_fwd_txfm1d.c"

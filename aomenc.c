@@ -479,8 +479,7 @@ static const arg_def_t error_resilient_mode =
             "(0: false (default), 1: true)");
 static const arg_def_t aq_mode = ARG_DEF(
     NULL, "aq-mode", 1,
-    "Adaptive quantization mode (0: off (default), 1: variance 2: complexity, "
-    "3: cyclic refresh)");
+    "Adaptive quantization mode (0: off (default), 1: variance 2: complexity)");
 static const arg_def_t deltaq_mode = ARG_DEF(
     NULL, "deltaq-mode", 1,
     "Delta qindex mode (0: off (default), 1: deltaq 2: deltaq + deltalf)");

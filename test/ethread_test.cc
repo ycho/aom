@@ -79,7 +79,7 @@ class AVxEncoderThreadTest
         encoder->Control(AV1E_SET_FRAME_PARALLEL_DECODING, 0);
       } else {
         encoder->Control(AOME_SET_ENABLEAUTOALTREF, 0);
-        encoder->Control(AV1E_SET_AQ_MODE, 3);
+        encoder->Control(AV1E_SET_AQ_MODE, 2);
       }
       encoder_initialized_ = true;
     }
