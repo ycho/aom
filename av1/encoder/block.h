@@ -16,9 +16,6 @@
 #include "av1/common/entropy.h"
 #include "av1/common/mvref_common.h"
 #include "av1/encoder/hash.h"
-#if CONFIG_DIST_8X8
-#include "aom/aomcx.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -340,10 +337,6 @@ struct macroblock {
   int use_default_intra_tx_type;
   // use default transform and skip transform type search for inter modes
   int use_default_inter_tx_type;
-#if CONFIG_DIST_8X8
-  int using_dist_8x8;
-  aom_tune_metric tune_metric;
-#endif  // CONFIG_DIST_8X8
   int comp_idx_cost[COMP_INDEX_CONTEXTS][2];
   int comp_group_idx_cost[COMP_GROUP_IDX_CONTEXTS][2];
   // Bit flags for pruning tx type search, tx split, etc.

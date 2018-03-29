@@ -56,9 +56,6 @@ struct av1_extracfg {
   unsigned int qm_v;
   unsigned int qm_min;
   unsigned int qm_max;
-#if CONFIG_DIST_8X8
-  unsigned int enable_dist_8x8;
-#endif
   unsigned int num_tg;
   unsigned int mtu_size;
 
@@ -123,9 +120,6 @@ static struct av1_extracfg default_extra_cfg = {
   DEFAULT_QM_V,      // qm_v
   DEFAULT_QM_FIRST,  // qm_min
   DEFAULT_QM_LAST,   // qm_max
-#if CONFIG_DIST_8X8
-  0,
-#endif
   1,                            // max number of tile groups
   0,                            // mtu_size
   AOM_TIMING_UNSPECIFIED,       // No picture timing signaling in bitstream
@@ -366,11 +360,7 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
               AOM_CICP_MC_ICTCP);
   RANGE_CHECK(extra_cfg, color_range, 0, 1);
 
-#if CONFIG_DIST_8X8
-  RANGE_CHECK(extra_cfg, tuning, AOM_TUNE_PSNR, AOM_TUNE_DAALA_DIST);
-#else
   RANGE_CHECK(extra_cfg, tuning, AOM_TUNE_PSNR, AOM_TUNE_SSIM);
-#endif
 
 #if CONFIG_BUFFER_MODEL
   RANGE_CHECK(extra_cfg, timing_info_type, AOM_TIMING_UNSPECIFIED,
@@ -385,10 +375,6 @@ static aom_codec_err_t validate_config(aom_codec_alg_priv_t *ctx,
   if (extra_cfg->lossless) {
     if (extra_cfg->aq_mode != 0)
       ERROR("Only --aq_mode=0 can be used with --lossless=1.");
-#if CONFIG_DIST_8X8
-    if (extra_cfg->enable_dist_8x8)
-      ERROR("dist-8x8 cannot be used with lossless compression.");
-#endif
   }
 
   return AOM_CODEC_OK;
@@ -547,12 +533,6 @@ static aom_codec_err_t set_encoder_config(
   oxcf->qm_v = extra_cfg->qm_v;
   oxcf->qm_minlevel = extra_cfg->qm_min;
   oxcf->qm_maxlevel = extra_cfg->qm_max;
-#if CONFIG_DIST_8X8
-  oxcf->using_dist_8x8 = extra_cfg->enable_dist_8x8;
-  if (extra_cfg->tuning == AOM_TUNE_CDEF_DIST ||
-      extra_cfg->tuning == AOM_TUNE_DAALA_DIST)
-    oxcf->using_dist_8x8 = 1;
-#endif
   oxcf->num_tile_groups = extra_cfg->num_tg;
   // In large-scale tile encoding mode, num_tile_groups is always 1.
   if (cfg->large_scale_tile) oxcf->num_tile_groups = 1;
@@ -949,14 +929,7 @@ static aom_codec_err_t ctrl_set_qm_max(aom_codec_alg_priv_t *ctx,
   extra_cfg.qm_max = CAST(AV1E_SET_QM_MAX, args);
   return update_extra_cfg(ctx, &extra_cfg);
 }
-#if CONFIG_DIST_8X8
-static aom_codec_err_t ctrl_set_enable_dist_8x8(aom_codec_alg_priv_t *ctx,
-                                                va_list args) {
-  struct av1_extracfg extra_cfg = ctx->extra_cfg;
-  extra_cfg.enable_dist_8x8 = CAST(AV1E_SET_ENABLE_DIST_8X8, args);
-  return update_extra_cfg(ctx, &extra_cfg);
-}
-#endif
+
 static aom_codec_err_t ctrl_set_num_tg(aom_codec_alg_priv_t *ctx,
                                        va_list args) {
   struct av1_extracfg extra_cfg = ctx->extra_cfg;
@@ -1706,9 +1679,6 @@ static aom_codec_ctrl_fn_map_t encoder_ctrl_maps[] = {
   { AV1E_SET_QM_V, ctrl_set_qm_v },
   { AV1E_SET_QM_MIN, ctrl_set_qm_min },
   { AV1E_SET_QM_MAX, ctrl_set_qm_max },
-#if CONFIG_DIST_8X8
-  { AV1E_SET_ENABLE_DIST_8X8, ctrl_set_enable_dist_8x8 },
-#endif
   { AV1E_SET_NUM_TG, ctrl_set_num_tg },
   { AV1E_SET_MTU, ctrl_set_mtu },
   { AV1E_SET_TIMING_INFO_TYPE, ctrl_set_timing_info_type },

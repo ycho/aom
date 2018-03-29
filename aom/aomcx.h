@@ -637,21 +637,6 @@ enum aome_enc_control_id {
    */
   AV1E_SET_QM_V,
 
-  /*!\brief Codec control function to encode with dist_8x8.
-   *
-   *  The dist_8x8 is enabled automatically for model tuning parameters that
-   *  require measuring distortion at the 8x8 level. This control also allows
-   *  measuring distortion at the 8x8 level for other tuning options
-   *  (e.g., PSNR), for testing purposes.
-   *                          0 = do not use dist_8x8
-   *                          1 = use dist_8x8
-   *
-   *  By default, the encoder does not use dist_8x8
-   *
-   * Experiment: DIST_8X8
-   */
-  AV1E_SET_ENABLE_DIST_8X8,
-
   /*!\brief Codec control function to set a maximum number of tile groups.
    *
    * This will set the maximum number of tile groups. This will be
@@ -1017,9 +1002,6 @@ AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_RESTORATION, unsigned int)
 
 AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_QM, unsigned int)
 #define AOM_CTRL_AV1E_SET_ENABLE_QM
-
-AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_DIST_8X8, unsigned int)
-#define AOM_CTRL_AV1E_SET_ENABLE_DIST_8X8
 
 AOM_CTRL_USE_TYPE(AV1E_SET_QM_MIN, unsigned int)
 #define AOM_CTRL_AV1E_SET_QM_MIN

@@ -411,404 +411,6 @@ static unsigned pixel_dist_visible_only(
   return sse;
 }
 
-#if CONFIG_DIST_8X8
-static uint64_t cdef_dist_8x8_16bit(uint16_t *dst, int dstride, uint16_t *src,
-                                    int sstride, int coeff_shift) {
-  uint64_t svar = 0;
-  uint64_t dvar = 0;
-  uint64_t sum_s = 0;
-  uint64_t sum_d = 0;
-  uint64_t sum_s2 = 0;
-  uint64_t sum_d2 = 0;
-  uint64_t sum_sd = 0;
-  uint64_t dist = 0;
-
-  int i, j;
-  for (i = 0; i < 8; i++) {
-    for (j = 0; j < 8; j++) {
-      sum_s += src[i * sstride + j];
-      sum_d += dst[i * dstride + j];
-      sum_s2 += src[i * sstride + j] * src[i * sstride + j];
-      sum_d2 += dst[i * dstride + j] * dst[i * dstride + j];
-      sum_sd += src[i * sstride + j] * dst[i * dstride + j];
-    }
-  }
-  /* Compute the variance -- the calculation cannot go negative. */
-  svar = sum_s2 - ((sum_s * sum_s + 32) >> 6);
-  dvar = sum_d2 - ((sum_d * sum_d + 32) >> 6);
-
-  // Tuning of jm's original dering distortion metric used in CDEF tool,
-  // suggested by jm
-  const uint64_t a = 4;
-  const uint64_t b = 2;
-  const uint64_t c1 = (400 * a << 2 * coeff_shift);
-  const uint64_t c2 = (b * 20000 * a * a << 4 * coeff_shift);
-
-  dist = (uint64_t)floor(.5 + (sum_d2 + sum_s2 - 2 * sum_sd) * .5 *
-                                  (svar + dvar + c1) /
-                                  (sqrt(svar * (double)dvar + c2)));
-
-  // Calibrate dist to have similar rate for the same QP with MSE only
-  // distortion (as in master branch)
-  dist = (uint64_t)((float)dist * 0.75);
-
-  return dist;
-}
-
-static int od_compute_var_4x4(uint16_t *x, int stride) {
-  int sum;
-  int s2;
-  int i;
-  sum = 0;
-  s2 = 0;
-  for (i = 0; i < 4; i++) {
-    int j;
-    for (j = 0; j < 4; j++) {
-      int t;
-
-      t = x[i * stride + j];
-      sum += t;
-      s2 += t * t;
-    }
-  }
-
-  return (s2 - (sum * sum >> 4)) >> 4;
-}
-
-/* OD_DIST_LP_MID controls the frequency weighting filter used for computing
-   the distortion. For a value X, the filter is [1 X 1]/(X + 2) and
-   is applied both horizontally and vertically. For X=5, the filter is
-   a good approximation for the OD_QM8_Q4_HVS quantization matrix. */
-#define OD_DIST_LP_MID (5)
-#define OD_DIST_LP_NORM (OD_DIST_LP_MID + 2)
-
-static double od_compute_dist_8x8(int use_activity_masking, uint16_t *x,
-                                  uint16_t *y, od_coeff *e_lp, int stride) {
-  double sum;
-  int min_var;
-  double mean_var;
-  double var_stat;
-  double activity;
-  double calibration;
-  int i;
-  int j;
-  double vardist;
-
-  vardist = 0;
-
-#if 1
-  min_var = INT_MAX;
-  mean_var = 0;
-  for (i = 0; i < 3; i++) {
-    for (j = 0; j < 3; j++) {
-      int varx;
-      int vary;
-      varx = od_compute_var_4x4(x + 2 * i * stride + 2 * j, stride);
-      vary = od_compute_var_4x4(y + 2 * i * stride + 2 * j, stride);
-      min_var = OD_MINI(min_var, varx);
-      mean_var += 1. / (1 + varx);
-      /* The cast to (double) is to avoid an overflow before the sqrt.*/
-      vardist += varx - 2 * sqrt(varx * (double)vary) + vary;
-    }
-  }
-  /* We use a different variance statistic depending on whether activity
-     masking is used, since the harmonic mean appeared slightly worse with
-     masking off. The calibration constant just ensures that we preserve the
-     rate compared to activity=1. */
-  if (use_activity_masking) {
-    calibration = 1.95;
-    var_stat = 9. / mean_var;
-  } else {
-    calibration = 1.62;
-    var_stat = min_var;
-  }
-  /* 1.62 is a calibration constant, 0.25 is a noise floor and 1/6 is the
-     activity masking constant. */
-  activity = calibration * pow(.25 + var_stat, -1. / 6);
-#else
-  activity = 1;
-#endif  // 1
-  sum = 0;
-  for (i = 0; i < 8; i++) {
-    for (j = 0; j < 8; j++)
-      sum += e_lp[i * stride + j] * (double)e_lp[i * stride + j];
-  }
-  /* Normalize the filter to unit DC response. */
-  sum *= 1. / (OD_DIST_LP_NORM * OD_DIST_LP_NORM * OD_DIST_LP_NORM *
-               OD_DIST_LP_NORM);
-  return activity * activity * (sum + vardist);
-}
-
-// Note : Inputs x and y are in a pixel domain
-static double od_compute_dist_common(int activity_masking, uint16_t *x,
-                                     uint16_t *y, int bsize_w, int bsize_h,
-                                     int qindex, od_coeff *tmp,
-                                     od_coeff *e_lp) {
-  int i, j;
-  double sum = 0;
-  const int mid = OD_DIST_LP_MID;
-
-  for (j = 0; j < bsize_w; j++) {
-    e_lp[j] = mid * tmp[j] + 2 * tmp[bsize_w + j];
-    e_lp[(bsize_h - 1) * bsize_w + j] = mid * tmp[(bsize_h - 1) * bsize_w + j] +
-                                        2 * tmp[(bsize_h - 2) * bsize_w + j];
-  }
-  for (i = 1; i < bsize_h - 1; i++) {
-    for (j = 0; j < bsize_w; j++) {
-      e_lp[i * bsize_w + j] = mid * tmp[i * bsize_w + j] +
-                              tmp[(i - 1) * bsize_w + j] +
-                              tmp[(i + 1) * bsize_w + j];
-    }
-  }
-  for (i = 0; i < bsize_h; i += 8) {
-    for (j = 0; j < bsize_w; j += 8) {
-      sum += od_compute_dist_8x8(activity_masking, &x[i * bsize_w + j],
-                                 &y[i * bsize_w + j], &e_lp[i * bsize_w + j],
-                                 bsize_w);
-    }
-  }
-  /* Scale according to linear regression against SSE, for 8x8 blocks. */
-  if (activity_masking) {
-    sum *= 2.2 + (1.7 - 2.2) * (qindex - 99) / (210 - 99) +
-           (qindex < 99 ? 2.5 * (qindex - 99) / 99 * (qindex - 99) / 99 : 0);
-  } else {
-    sum *= qindex >= 128
-               ? 1.4 + (0.9 - 1.4) * (qindex - 128) / (209 - 128)
-               : qindex <= 43 ? 1.5 + (2.0 - 1.5) * (qindex - 43) / (16 - 43)
-                              : 1.5 + (1.4 - 1.5) * (qindex - 43) / (128 - 43);
-  }
-
-  return sum;
-}
-
-static double od_compute_dist(uint16_t *x, uint16_t *y, int bsize_w,
-                              int bsize_h, int qindex) {
-  assert(bsize_w >= 8 && bsize_h >= 8);
-
-  int activity_masking = 0;
-
-  int i, j;
-  DECLARE_ALIGNED(16, od_coeff, e[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(16, od_coeff, tmp[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(16, od_coeff, e_lp[MAX_TX_SQUARE]);
-  for (i = 0; i < bsize_h; i++) {
-    for (j = 0; j < bsize_w; j++) {
-      e[i * bsize_w + j] = x[i * bsize_w + j] - y[i * bsize_w + j];
-    }
-  }
-  int mid = OD_DIST_LP_MID;
-  for (i = 0; i < bsize_h; i++) {
-    tmp[i * bsize_w] = mid * e[i * bsize_w] + 2 * e[i * bsize_w + 1];
-    tmp[i * bsize_w + bsize_w - 1] =
-        mid * e[i * bsize_w + bsize_w - 1] + 2 * e[i * bsize_w + bsize_w - 2];
-    for (j = 1; j < bsize_w - 1; j++) {
-      tmp[i * bsize_w + j] = mid * e[i * bsize_w + j] + e[i * bsize_w + j - 1] +
-                             e[i * bsize_w + j + 1];
-    }
-  }
-  return od_compute_dist_common(activity_masking, x, y, bsize_w, bsize_h,
-                                qindex, tmp, e_lp);
-}
-
-static double od_compute_dist_diff(uint16_t *x, int16_t *e, int bsize_w,
-                                   int bsize_h, int qindex) {
-  assert(bsize_w >= 8 && bsize_h >= 8);
-
-  int activity_masking = 0;
-
-  DECLARE_ALIGNED(16, uint16_t, y[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(16, od_coeff, tmp[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(16, od_coeff, e_lp[MAX_TX_SQUARE]);
-  int i, j;
-  for (i = 0; i < bsize_h; i++) {
-    for (j = 0; j < bsize_w; j++) {
-      y[i * bsize_w + j] = x[i * bsize_w + j] - e[i * bsize_w + j];
-    }
-  }
-  int mid = OD_DIST_LP_MID;
-  for (i = 0; i < bsize_h; i++) {
-    tmp[i * bsize_w] = mid * e[i * bsize_w] + 2 * e[i * bsize_w + 1];
-    tmp[i * bsize_w + bsize_w - 1] =
-        mid * e[i * bsize_w + bsize_w - 1] + 2 * e[i * bsize_w + bsize_w - 2];
-    for (j = 1; j < bsize_w - 1; j++) {
-      tmp[i * bsize_w + j] = mid * e[i * bsize_w + j] + e[i * bsize_w + j - 1] +
-                             e[i * bsize_w + j + 1];
-    }
-  }
-  return od_compute_dist_common(activity_masking, x, y, bsize_w, bsize_h,
-                                qindex, tmp, e_lp);
-}
-
-int64_t av1_dist_8x8(const AV1_COMP *const cpi, const MACROBLOCK *x,
-                     const uint8_t *src, int src_stride, const uint8_t *dst,
-                     int dst_stride, const BLOCK_SIZE tx_bsize, int bsw,
-                     int bsh, int visible_w, int visible_h, int qindex) {
-  int64_t d = 0;
-  int i, j;
-  const MACROBLOCKD *xd = &x->e_mbd;
-
-  DECLARE_ALIGNED(16, uint16_t, orig[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(16, uint16_t, rec[MAX_TX_SQUARE]);
-
-  assert(bsw >= 8);
-  assert(bsh >= 8);
-  assert((bsw & 0x07) == 0);
-  assert((bsh & 0x07) == 0);
-
-  if (x->tune_metric == AOM_TUNE_CDEF_DIST ||
-      x->tune_metric == AOM_TUNE_DAALA_DIST) {
-    if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
-      for (j = 0; j < bsh; j++)
-        for (i = 0; i < bsw; i++)
-          orig[j * bsw + i] = CONVERT_TO_SHORTPTR(src)[j * src_stride + i];
-
-      if ((bsw == visible_w) && (bsh == visible_h)) {
-        for (j = 0; j < bsh; j++)
-          for (i = 0; i < bsw; i++)
-            rec[j * bsw + i] = CONVERT_TO_SHORTPTR(dst)[j * dst_stride + i];
-      } else {
-        for (j = 0; j < visible_h; j++)
-          for (i = 0; i < visible_w; i++)
-            rec[j * bsw + i] = CONVERT_TO_SHORTPTR(dst)[j * dst_stride + i];
-
-        if (visible_w < bsw) {
-          for (j = 0; j < bsh; j++)
-            for (i = visible_w; i < bsw; i++)
-              rec[j * bsw + i] = CONVERT_TO_SHORTPTR(src)[j * src_stride + i];
-        }
-
-        if (visible_h < bsh) {
-          for (j = visible_h; j < bsh; j++)
-            for (i = 0; i < bsw; i++)
-              rec[j * bsw + i] = CONVERT_TO_SHORTPTR(src)[j * src_stride + i];
-        }
-      }
-    } else {
-      for (j = 0; j < bsh; j++)
-        for (i = 0; i < bsw; i++) orig[j * bsw + i] = src[j * src_stride + i];
-
-      if ((bsw == visible_w) && (bsh == visible_h)) {
-        for (j = 0; j < bsh; j++)
-          for (i = 0; i < bsw; i++) rec[j * bsw + i] = dst[j * dst_stride + i];
-      } else {
-        for (j = 0; j < visible_h; j++)
-          for (i = 0; i < visible_w; i++)
-            rec[j * bsw + i] = dst[j * dst_stride + i];
-
-        if (visible_w < bsw) {
-          for (j = 0; j < bsh; j++)
-            for (i = visible_w; i < bsw; i++)
-              rec[j * bsw + i] = src[j * src_stride + i];
-        }
-
-        if (visible_h < bsh) {
-          for (j = visible_h; j < bsh; j++)
-            for (i = 0; i < bsw; i++)
-              rec[j * bsw + i] = src[j * src_stride + i];
-        }
-      }
-    }
-  }
-
-  if (x->tune_metric == AOM_TUNE_DAALA_DIST) {
-    d = (int64_t)od_compute_dist(orig, rec, bsw, bsh, qindex);
-  } else if (x->tune_metric == AOM_TUNE_CDEF_DIST) {
-    int coeff_shift = AOMMAX(xd->bd - 8, 0);
-
-    for (i = 0; i < bsh; i += 8) {
-      for (j = 0; j < bsw; j += 8) {
-        d += cdef_dist_8x8_16bit(&rec[i * bsw + j], bsw, &orig[i * bsw + j],
-                                 bsw, coeff_shift);
-      }
-    }
-    if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH)
-      d = ((uint64_t)d) >> 2 * coeff_shift;
-  } else {
-    // Otherwise, MSE by default
-    d = pixel_dist_visible_only(cpi, x, src, src_stride, dst, dst_stride,
-                                tx_bsize, bsh, bsw, visible_h, visible_w);
-  }
-
-  return d;
-}
-
-static int64_t dist_8x8_diff(const MACROBLOCK *x, const uint8_t *src,
-                             int src_stride, const int16_t *diff,
-                             int diff_stride, int bsw, int bsh, int visible_w,
-                             int visible_h, int qindex) {
-  int64_t d = 0;
-  int i, j;
-  const MACROBLOCKD *xd = &x->e_mbd;
-
-  DECLARE_ALIGNED(16, uint16_t, orig[MAX_TX_SQUARE]);
-  DECLARE_ALIGNED(16, int16_t, diff16[MAX_TX_SQUARE]);
-
-  assert(bsw >= 8);
-  assert(bsh >= 8);
-  assert((bsw & 0x07) == 0);
-  assert((bsh & 0x07) == 0);
-
-  if (x->tune_metric == AOM_TUNE_CDEF_DIST ||
-      x->tune_metric == AOM_TUNE_DAALA_DIST) {
-    if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
-      for (j = 0; j < bsh; j++)
-        for (i = 0; i < bsw; i++)
-          orig[j * bsw + i] = CONVERT_TO_SHORTPTR(src)[j * src_stride + i];
-    } else {
-      for (j = 0; j < bsh; j++)
-        for (i = 0; i < bsw; i++) orig[j * bsw + i] = src[j * src_stride + i];
-    }
-
-    if ((bsw == visible_w) && (bsh == visible_h)) {
-      for (j = 0; j < bsh; j++)
-        for (i = 0; i < bsw; i++)
-          diff16[j * bsw + i] = diff[j * diff_stride + i];
-    } else {
-      for (j = 0; j < visible_h; j++)
-        for (i = 0; i < visible_w; i++)
-          diff16[j * bsw + i] = diff[j * diff_stride + i];
-
-      if (visible_w < bsw) {
-        for (j = 0; j < bsh; j++)
-          for (i = visible_w; i < bsw; i++) diff16[j * bsw + i] = 0;
-      }
-
-      if (visible_h < bsh) {
-        for (j = visible_h; j < bsh; j++)
-          for (i = 0; i < bsw; i++) diff16[j * bsw + i] = 0;
-      }
-    }
-  }
-
-  if (x->tune_metric == AOM_TUNE_DAALA_DIST) {
-    d = (int64_t)od_compute_dist_diff(orig, diff16, bsw, bsh, qindex);
-  } else if (x->tune_metric == AOM_TUNE_CDEF_DIST) {
-    int coeff_shift = AOMMAX(xd->bd - 8, 0);
-    DECLARE_ALIGNED(16, uint16_t, dst16[MAX_TX_SQUARE]);
-
-    for (i = 0; i < bsh; i++) {
-      for (j = 0; j < bsw; j++) {
-        dst16[i * bsw + j] = orig[i * bsw + j] - diff16[i * bsw + j];
-      }
-    }
-
-    for (i = 0; i < bsh; i += 8) {
-      for (j = 0; j < bsw; j += 8) {
-        d += cdef_dist_8x8_16bit(&dst16[i * bsw + j], bsw, &orig[i * bsw + j],
-                                 bsw, coeff_shift);
-      }
-    }
-    // Don't scale 'd' for HBD since it will be done by caller side for diff
-    // input
-  } else {
-    // Otherwise, MSE by default
-    d = aom_sum_squares_2d_i16(diff, diff_stride, visible_w, visible_h);
-  }
-
-  return d;
-}
-#endif  // CONFIG_DIST_8X8
-
 static void get_energy_distribution_fine(const AV1_COMP *cpi, BLOCK_SIZE bsize,
                                          const uint8_t *src, int src_stride,
                                          const uint8_t *dst, int dst_stride,
@@ -1646,13 +1248,6 @@ static unsigned pixel_dist(const AV1_COMP *const cpi, const MACROBLOCK *x,
   assert(visible_rows > 0);
   assert(visible_cols > 0);
 
-#if CONFIG_DIST_8X8
-  if (x->using_dist_8x8 && plane == 0 && txb_cols >= 8 && txb_rows >= 8)
-    return (unsigned)av1_dist_8x8(cpi, x, src, src_stride, dst, dst_stride,
-                                  tx_bsize, txb_cols, txb_rows, visible_cols,
-                                  visible_rows, x->qindex);
-#endif  // CONFIG_DIST_8X8
-
   unsigned sse = pixel_dist_visible_only(cpi, x, src, src_stride, dst,
                                          dst_stride, tx_bsize, txb_rows,
                                          txb_cols, visible_rows, visible_cols);
@@ -1669,24 +1264,11 @@ static int64_t pixel_diff_dist(const MACROBLOCK *x, int plane,
                                const BLOCK_SIZE tx_bsize) {
   int visible_rows, visible_cols;
   const MACROBLOCKD *xd = &x->e_mbd;
-#if CONFIG_DIST_8X8
-  int txb_height = block_size_high[tx_bsize];
-  int txb_width = block_size_wide[tx_bsize];
-  const int src_stride = x->plane[plane].src.stride;
-  const int src_idx = (blk_row * src_stride + blk_col) << tx_size_wide_log2[0];
-  const uint8_t *src = &x->plane[plane].src.buf[src_idx];
-#endif
 
   get_txb_dimensions(xd, plane, plane_bsize, blk_row, blk_col, tx_bsize, NULL,
                      NULL, &visible_cols, &visible_rows);
 
-#if CONFIG_DIST_8X8
-  if (x->using_dist_8x8 && plane == 0 && txb_width >= 8 && txb_height >= 8)
-    return dist_8x8_diff(x, src, src_stride, diff, diff_stride, txb_width,
-                         txb_height, visible_cols, visible_rows, x->qindex);
-  else
-#endif
-    return aom_sum_squares_2d_i16(diff, diff_stride, visible_cols,
+  return aom_sum_squares_2d_i16(diff, diff_stride, visible_cols,
                                   visible_rows);
 }
 
@@ -1775,11 +1357,7 @@ void dist_block(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
                 int use_transform_domain_distortion) {
   MACROBLOCKD *const xd = &x->e_mbd;
   const struct macroblock_plane *const p = &x->plane[plane];
-#if CONFIG_DIST_8X8
-  struct macroblockd_plane *const pd = &xd->plane[plane];
-#else   // CONFIG_DIST_8X8
   const struct macroblockd_plane *const pd = &xd->plane[plane];
-#endif  // CONFIG_DIST_8X8
   const uint16_t eob = p->eobs[block];
 
   // When eob is 0, pixel domain distortion is more efficient and accurate.
@@ -1862,30 +1440,6 @@ void dist_block(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
         av1_inverse_transform_block(xd, dqcoeff, plane, tx_type, tx_size, recon,
                                     MAX_TX_SIZE, eob,
                                     cpi->common.reduced_tx_set_used);
-
-#if CONFIG_DIST_8X8
-        if (x->using_dist_8x8 && plane == 0 && (bsw < 8 || bsh < 8)) {
-          // Save decoded pixels for inter block in pd->pred to avoid
-          // block_8x8_rd_txfm_daala_dist() need to produce them
-          // by calling av1_inverse_transform_block() again.
-          const int pred_stride = block_size_wide[plane_bsize];
-          const int pred_idx = (blk_row * pred_stride + blk_col)
-                               << tx_size_wide_log2[0];
-          int16_t *pred = &pd->pred[pred_idx];
-          int i, j;
-
-          if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
-            for (j = 0; j < bsh; j++)
-              for (i = 0; i < bsw; i++)
-                pred[j * pred_stride + i] =
-                    CONVERT_TO_SHORTPTR(recon)[j * MAX_TX_SIZE + i];
-          } else {
-            for (j = 0; j < bsh; j++)
-              for (i = 0; i < bsw; i++)
-                pred[j * pred_stride + i] = recon[j * MAX_TX_SIZE + i];
-          }
-        }
-#endif  // CONFIG_DIST_8X8
         *out_dist =
             pixel_dist(cpi, x, plane, src, src_stride, recon, MAX_TX_SIZE,
                        blk_row, blk_col, plane_bsize, tx_bsize);
@@ -2300,9 +1854,7 @@ static int64_t search_txk_type(const AV1_COMP *cpi, MACROBLOCK *x, int plane,
       // Therefore transform domain distortion is not valid for these
       // transform sizes.
       txsize_sqr_up_map[tx_size] != TX_64X64;
-#if CONFIG_DIST_8X8
-  if (x->using_dist_8x8) use_transform_domain_distortion = 0;
-#endif
+
   for (TX_TYPE tx_type = txk_start; tx_type <= txk_end; ++tx_type) {
     if (!allowed_tx_mask[tx_type]) continue;
     if (plane == 0) mbmi->txk_type[txk_type_idx] = tx_type;
@@ -2440,21 +1992,6 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
   int64_t rd1, rd2, rd;
   RD_STATS this_rd_stats;
 
-#if CONFIG_DIST_8X8
-  // If sub8x8 tx, 8x8 or larger partition, and luma channel,
-  // dist-8x8 disables early skip, because the distortion metrics for
-  // sub8x8 tx (MSE) and reference distortion from 8x8 or larger partition
-  // (new distortion metric) are different.
-  // Exception is: dist-8x8 is enabled but still MSE is used,
-  // i.e. "--tune=" encoder option is not used.
-  int bw = block_size_wide[plane_bsize];
-  int bh = block_size_high[plane_bsize];
-  int disable_early_skip =
-      x->using_dist_8x8 && plane == AOM_PLANE_Y && bw >= 8 && bh >= 8 &&
-      (tx_size == TX_4X4 || tx_size == TX_4X8 || tx_size == TX_8X4) &&
-      x->tune_metric != AOM_TUNE_PSNR;
-#endif  // CONFIG_DIST_8X8
-
   av1_init_rd_stats(&this_rd_stats);
 
   if (args->exit_early) return;
@@ -2497,100 +2034,11 @@ static void block_rd_txfm(int plane, int block, int blk_row, int blk_col,
 
   args->this_rd += rd;
 
-#if CONFIG_DIST_8X8
-  if (!disable_early_skip)
-#endif
-    if (args->this_rd > args->best_rd) {
-      args->exit_early = 1;
-      return;
-    }
-}
-
-#if CONFIG_DIST_8X8
-static void dist_8x8_sub8x8_txfm_rd(const AV1_COMP *const cpi, MACROBLOCK *x,
-                                    BLOCK_SIZE bsize,
-                                    struct rdcost_block_args *args) {
-  MACROBLOCKD *const xd = &x->e_mbd;
-  const struct macroblockd_plane *const pd = &xd->plane[0];
-  const struct macroblock_plane *const p = &x->plane[0];
-  MB_MODE_INFO *const mbmi = xd->mi[0];
-  const int src_stride = p->src.stride;
-  const int dst_stride = pd->dst.stride;
-  const uint8_t *src = &p->src.buf[0];
-  const uint8_t *dst = &pd->dst.buf[0];
-  const int16_t *pred = &pd->pred[0];
-  int bw = block_size_wide[bsize];
-  int bh = block_size_high[bsize];
-  int visible_w = bw;
-  int visible_h = bh;
-
-  int i, j;
-  int64_t rd, rd1, rd2;
-  int64_t sse = INT64_MAX, dist = INT64_MAX;
-  int qindex = x->qindex;
-
-  assert((bw & 0x07) == 0);
-  assert((bh & 0x07) == 0);
-
-  get_txb_dimensions(xd, 0, bsize, 0, 0, bsize, &bw, &bh, &visible_w,
-                     &visible_h);
-
-  const int diff_stride = block_size_wide[bsize];
-  const int16_t *diff = p->src_diff;
-  sse = dist_8x8_diff(x, src, src_stride, diff, diff_stride, bw, bh, visible_w,
-                      visible_h, qindex);
-  sse = ROUND_POWER_OF_TWO(sse, (xd->bd - 8) * 2);
-  sse *= 16;
-
-  if (!is_inter_block(mbmi)) {
-    dist = av1_dist_8x8(cpi, x, src, src_stride, dst, dst_stride, bsize, bw, bh,
-                        visible_w, visible_h, qindex);
-    dist *= 16;
-  } else {
-    // For inter mode, the decoded pixels are provided in pd->pred,
-    // while the predicted pixels are in dst.
-    uint8_t *pred8;
-    DECLARE_ALIGNED(16, uint16_t, pred16[MAX_SB_SQUARE]);
-
-    if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH)
-      pred8 = CONVERT_TO_BYTEPTR(pred16);
-    else
-      pred8 = (uint8_t *)pred16;
-
-    if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
-      for (j = 0; j < bh; j++)
-        for (i = 0; i < bw; i++)
-          CONVERT_TO_SHORTPTR(pred8)[j * bw + i] = pred[j * bw + i];
-    } else {
-      for (j = 0; j < bh; j++)
-        for (i = 0; i < bw; i++) pred8[j * bw + i] = (uint8_t)pred[j * bw + i];
-    }
-
-    dist = av1_dist_8x8(cpi, x, src, src_stride, pred8, bw, bsize, bw, bh,
-                        visible_w, visible_h, qindex);
-    dist *= 16;
+  if (args->this_rd > args->best_rd) {
+    args->exit_early = 1;
+    return;
   }
-
-#ifdef DEBUG_DIST_8X8
-  if (x->tune_metric == AOM_TUNE_PSNR && xd->bd == 8) {
-    assert(args->rd_stats.sse == sse);
-    assert(args->rd_stats.dist == dist);
-  }
-#endif  // DEBUG_DIST_8X8
-
-  args->rd_stats.sse = sse;
-  args->rd_stats.dist = dist;
-
-  rd1 = RDCOST(x->rdmult, args->rd_stats.rate, args->rd_stats.dist);
-  rd2 = RDCOST(x->rdmult, 0, args->rd_stats.sse);
-  rd = AOMMIN(rd1, rd2);
-
-  args->rd_stats.rdcost = rd;
-  args->this_rd = rd;
-
-  if (args->this_rd > args->best_rd) args->exit_early = 1;
 }
-#endif  // CONFIG_DIST_8X8
 
 static void txfm_rd_in_plane(MACROBLOCK *x, const AV1_COMP *cpi,
                              RD_STATS *rd_stats, int64_t ref_best_rd, int plane,
@@ -2612,15 +2060,6 @@ static void txfm_rd_in_plane(MACROBLOCK *x, const AV1_COMP *cpi,
 
   av1_foreach_transformed_block_in_plane(xd, bsize, plane, block_rd_txfm,
                                          &args);
-#if CONFIG_DIST_8X8
-  int bw = block_size_wide[bsize];
-  int bh = block_size_high[bsize];
-
-  if (x->using_dist_8x8 && !args.exit_early && plane == 0 && bw >= 8 &&
-      bh >= 8 && (tx_size == TX_4X4 || tx_size == TX_4X8 || tx_size == TX_8X4))
-    dist_8x8_sub8x8_txfm_rd(cpi, x, bsize, &args);
-#endif
-
   if (args.exit_early) {
     av1_invalid_rd_stats(rd_stats);
   } else {
@@ -3940,10 +3379,7 @@ static void select_tx_block(const AV1_COMP *cpi, MACROBLOCK *x, int blk_row,
     RD_STATS this_rd_stats;
     int this_cost_valid = 1;
     int64_t tmp_rd = 0;
-#if CONFIG_DIST_8X8
-    int sub8x8_eob[4] = { 0, 0, 0, 0 };
-    struct macroblockd_plane *const pd = &xd->plane[0];
-#endif
+
     sum_rd_stats.rate = x->txfm_partition_cost[ctx][1];
 
     assert(tx_size < TX_SIZES_ALL);
@@ -3963,118 +3399,17 @@ static void select_tx_block(const AV1_COMP *cpi, MACROBLOCK *x, int blk_row,
             &this_cost_valid, fast_tx_search,
             (rd_info_node != NULL) ? rd_info_node->children[blk_idx] : NULL);
 
-#if CONFIG_DIST_8X8
-        if (!x->using_dist_8x8)
-#endif
-          if (!this_cost_valid) break;
-#if CONFIG_DIST_8X8
-        if (x->using_dist_8x8 && tx_size == TX_8X8) {
-          sub8x8_eob[2 * (r / bsh) + (c / bsw)] = p->eobs[block];
-        }
-#endif  // CONFIG_DIST_8X8
+        if (!this_cost_valid) break;
+
         av1_merge_rd_stats(&sum_rd_stats, &this_rd_stats);
 
         tmp_rd = RDCOST(x->rdmult, sum_rd_stats.rate, sum_rd_stats.dist);
-#if CONFIG_DIST_8X8
-        if (!x->using_dist_8x8)
-#endif
-          if (this_rd < tmp_rd) break;
+
+        if (this_rd < tmp_rd) break;
+
         block += sub_step;
       }
     }
-#if CONFIG_DIST_8X8
-    if (x->using_dist_8x8 && this_cost_valid && tx_size == TX_8X8) {
-      const int src_stride = p->src.stride;
-      const int dst_stride = pd->dst.stride;
-
-      const uint8_t *src =
-          &p->src.buf[(blk_row * src_stride + blk_col) << tx_size_wide_log2[0]];
-      const uint8_t *dst =
-          &pd->dst
-               .buf[(blk_row * dst_stride + blk_col) << tx_size_wide_log2[0]];
-
-      int64_t dist_8x8;
-      const int qindex = x->qindex;
-      const int pred_stride = block_size_wide[plane_bsize];
-      const int pred_idx = (blk_row * pred_stride + blk_col)
-                           << tx_size_wide_log2[0];
-      const int16_t *pred = &pd->pred[pred_idx];
-      int i, j;
-      int row, col;
-
-      uint8_t *pred8;
-      DECLARE_ALIGNED(16, uint16_t, pred8_16[8 * 8]);
-
-      dist_8x8 = av1_dist_8x8(cpi, x, src, src_stride, dst, dst_stride,
-                              BLOCK_8X8, 8, 8, 8, 8, qindex) *
-                 16;
-
-#ifdef DEBUG_DIST_8X8
-      if (x->tune_metric == AOM_TUNE_PSNR && xd->bd == 8)
-        assert(sum_rd_stats.sse == dist_8x8);
-#endif  // DEBUG_DIST_8X8
-
-      sum_rd_stats.sse = dist_8x8;
-
-      if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH)
-        pred8 = CONVERT_TO_BYTEPTR(pred8_16);
-      else
-        pred8 = (uint8_t *)pred8_16;
-
-      if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
-        for (row = 0; row < 2; ++row) {
-          for (col = 0; col < 2; ++col) {
-            int idx = row * 2 + col;
-            int eob = sub8x8_eob[idx];
-
-            if (eob > 0) {
-              for (j = 0; j < 4; j++)
-                for (i = 0; i < 4; i++)
-                  CONVERT_TO_SHORTPTR(pred8)
-                  [(row * 4 + j) * 8 + 4 * col + i] =
-                      pred[(row * 4 + j) * pred_stride + 4 * col + i];
-            } else {
-              for (j = 0; j < 4; j++)
-                for (i = 0; i < 4; i++)
-                  CONVERT_TO_SHORTPTR(pred8)
-                  [(row * 4 + j) * 8 + 4 * col + i] = CONVERT_TO_SHORTPTR(
-                      dst)[(row * 4 + j) * dst_stride + 4 * col + i];
-            }
-          }
-        }
-      } else {
-        for (row = 0; row < 2; ++row) {
-          for (col = 0; col < 2; ++col) {
-            int idx = row * 2 + col;
-            int eob = sub8x8_eob[idx];
-
-            if (eob > 0) {
-              for (j = 0; j < 4; j++)
-                for (i = 0; i < 4; i++)
-                  pred8[(row * 4 + j) * 8 + 4 * col + i] =
-                      (uint8_t)pred[(row * 4 + j) * pred_stride + 4 * col + i];
-            } else {
-              for (j = 0; j < 4; j++)
-                for (i = 0; i < 4; i++)
-                  pred8[(row * 4 + j) * 8 + 4 * col + i] =
-                      dst[(row * 4 + j) * dst_stride + 4 * col + i];
-            }
-          }
-        }
-      }
-      dist_8x8 = av1_dist_8x8(cpi, x, src, src_stride, pred8, 8, BLOCK_8X8, 8,
-                              8, 8, 8, qindex) *
-                 16;
-
-#ifdef DEBUG_DIST_8X8
-      if (x->tune_metric == AOM_TUNE_PSNR && xd->bd == 8)
-        assert(sum_rd_stats.dist == dist_8x8);
-#endif  // DEBUG_DIST_8X8
-
-      sum_rd_stats.dist = dist_8x8;
-      tmp_rd = RDCOST(x->rdmult, sum_rd_stats.rate, sum_rd_stats.dist);
-    }
-#endif  // CONFIG_DIST_8X8
     if (this_cost_valid) sum_rd = tmp_rd;
   }
 
