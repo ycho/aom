@@ -3469,6 +3469,8 @@ static void txfm_rd_in_plane(MACROBLOCK *x, const AV1_COMP *cpi,
   } else {
     *rd_stats = args.rd_stats;
   }
+  if (!is_inter && rd_stats->skip)
+    rd_stats->skip = 0;
 }
 
 static int tx_size_cost(const AV1_COMMON *const cm, const MACROBLOCK *const x,
@@ -3513,7 +3515,8 @@ static int64_t txfm_yrd(const AV1_COMP *const cpi, MACROBLOCK *x,
     skip_rd = RDCOST(x->rdmult, s1, 0);
     this_rd = RDCOST(x->rdmult, s0 + r_tx_size * tx_select, 0);
   } else {
-    skip_rd = RDCOST(x->rdmult, s1 + r_tx_size * tx_select, 0);
+    //skip_rd = RDCOST(x->rdmult, s1 + r_tx_size * tx_select, 0);
+    skip_rd = INT64_MAX;
     this_rd = RDCOST(x->rdmult, s0 + r_tx_size * tx_select, 0);
   }
 
